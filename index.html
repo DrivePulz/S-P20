@@ -1,0 +1,2013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>S&amp;P 20 — Shortlist Demo</title>
+<style>
+/* S&P 20 ships in dark mode only - no light theme, no toggle. */
+:root {
+  --bg: #0B0C0E;
+  --surface: #1A1B1E;
+  --surface-soft: #232427;
+  --border: #303236;
+  --text: #F2F2F4;
+  --text-muted: #A9ADB4;
+  --text-faint: #7A7E85;
+
+  --accent: #3D63DD;
+  --accent-soft: rgba(61, 99, 221, 0.18);
+
+  --good: #30D158;
+  --good-soft: rgba(48, 209, 88, 0.16);
+  --warn: #FF9F0A;
+  --warn-soft: rgba(255, 159, 10, 0.16);
+  --bad: #FF453A;
+  --bad-soft: rgba(255, 69, 58, 0.16);
+
+  --invert-bg: #3D63DD;
+  --invert-text: #FFFFFF;
+
+  /* Solid-fill badge colors, tuned separately from --good/--bad so white text
+     stays readable (those tokens are tuned for colored-text-on-soft-tint use). */
+  --signal-up-fill: #12894A;
+  --signal-down-fill: #D42E24;
+  --signal-on: #FFFFFF;
+
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.55);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.up { color: var(--good); }
+.down { color: var(--bad); }
+
+/* ---------------- App shell / responsive panes ---------------- */
+
+#app {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.pane { background: var(--bg); }
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  padding: 18px 20px 4px;
+}
+
+.btn-back {
+  display: none;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Narrow (phone): one pane visible at a time */
+@media (max-width: 859px) {
+  #app.detail-active .pane-list { display: none; }
+  #app:not(.detail-active) .pane-detail { display: none; }
+  .btn-back { display: block; }
+  .pane-detail { min-height: 100vh; }
+}
+
+/* Wide (tablet/desktop): two persistent panes */
+@media (min-width: 860px) {
+  #app {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 0;
+  }
+  .pane-list {
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+  }
+  .pane-detail {
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .watchlist-row.is-selected {
+    border-color: var(--text);
+    box-shadow: var(--shadow);
+  }
+}
+
+/* ---------------- List pane ---------------- */
+
+.list-header {
+  padding: 20px 20px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ---------------- floating app brand (fixed, top-right of the whole app) ---------------- */
+
+.app-brand {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 10px;
+  background: rgba(26, 27, 30, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+
+.app-brand-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.app-brand-icon rect {
+  fill: var(--accent);
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.brand-num {
+  display: inline-block;
+  margin-left: 5px;
+  background: var(--invert-bg);
+  color: var(--invert-text);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 2px 7px 3px;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.last-update {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.icon-btn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.icon-btn svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  fill: none;
+}
+
+.alerts-dot {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bad);
+  border: 1.5px solid var(--surface);
+}
+
+.alerts-dot.is-hidden { display: none; }
+
+/* ---------------- Alerts overlay ---------------- */
+
+.alerts-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 100;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.alerts-overlay.is-open {
+  display: flex;
+}
+
+.alerts-panel {
+  background: var(--bg);
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  border-radius: 20px 20px 0 0;
+  padding: 18px 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.alerts-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 4px;
+}
+
+.alerts-panel-header h2 {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.alerts-subtitle {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  padding: 0 20px;
+  margin: 4px 0 12px;
+}
+
+.alerts-list {
+  overflow-y: auto;
+  padding: 0 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alert-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.alert-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.alert-company {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-faint);
+}
+
+.alert-date {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.alert-badges {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.alert-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-muted);
+}
+
+.alert-badge.status-strengthened { background: var(--good-soft); color: var(--good); }
+.alert-badge.status-still-valid { background: var(--accent-soft); color: var(--accent); }
+.alert-badge.status-weakened { background: var(--warn-soft); color: var(--warn); }
+.alert-badge.status-invalidated { background: var(--bad-soft); color: var(--bad); }
+.alert-badge.status-shortlist { background: var(--accent-soft); color: var(--accent); }
+
+.alert-title {
+  font-weight: 700;
+  font-size: 14.5px;
+  margin-bottom: 6px;
+}
+
+.alert-body p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0 0 6px;
+}
+
+.alert-body .lbl {
+  font-weight: 700;
+  color: var(--text);
+}
+
+@media (min-width: 640px) {
+  .alerts-overlay { align-items: center; }
+  .alerts-panel { border-radius: 20px; }
+}
+
+.badge-demo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 3px 7px;
+  border-radius: 999px;
+}
+
+.dashboard-card {
+  margin: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.dashboard-k {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.dashboard-value {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+
+.dashboard-delta {
+  font-size: 14.5px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.dstat { text-align: left; }
+
+.dstat .k {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.dstat .v {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.list-toolbar {
+  padding: 6px 20px 4px;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin-bottom: 10px;
+}
+
+.shortlist-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: -4px 0 4px;
+}
+
+.shortlist-caption {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.4;
+  margin: 0 0 14px;
+}
+
+.timeframe-chips {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.chip {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+
+.chip.is-selected {
+  background: var(--invert-bg);
+  color: var(--invert-text);
+  border-color: var(--invert-bg);
+}
+
+.chip.is-locked {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chip.is-locked.is-selected {
+  background: var(--surface);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.chip .lock-ic {
+  font-size: 9px;
+  margin-right: 3px;
+  vertical-align: 1px;
+}
+
+.timeframe-lock-msg {
+  display: none;
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.4;
+  margin: -6px 0 14px;
+}
+
+.timeframe-lock-msg.is-visible {
+  display: block;
+}
+
+.watchlist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px;
+}
+
+.watchlist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.wr-rank {
+  flex-shrink: 0;
+  width: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.watchlist-row .wr-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.watchlist-row .ticker {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.watchlist-row .name {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.watchlist-row .badge-row {
+  margin-top: 4px;
+  display: flex;
+  gap: 5px;
+}
+
+.score-chip {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.score-chip.band-strong, .score-chip.band-attractive { background: var(--good-soft); color: var(--good); }
+.score-chip.band-watch { background: var(--warn-soft); color: var(--warn); }
+.score-chip.band-cautious, .score-chip.band-avoid { background: var(--bad-soft); color: var(--bad); }
+
+.wr-spark {
+  width: 70px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.wr-price {
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 74px;
+}
+
+.wr-price .price {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.wr-price .chg {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.shortlist-empty-note {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 16px 10px 4px;
+  line-height: 1.4;
+}
+
+/* ---------------- Detail pane ---------------- */
+
+.detail-scroll {
+  padding-bottom: 60px;
+}
+
+.detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 20px;
+}
+
+.empty-msg {
+  color: var(--text-faint);
+  font-size: 15px;
+  text-align: center;
+  max-width: 280px;
+}
+
+.detail-inner {
+  padding: 6px 20px 0;
+}
+
+.detail-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.detail-name {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 2px 0 10px;
+}
+
+.detail-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.detail-price {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.detail-chg {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.detail-rel {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  margin-bottom: 16px;
+}
+
+.detail-timeframe-chips {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.detail-timeframe-chips .chip { flex: 1; }
+
+.granularity-toggle {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: -4px 0 10px;
+}
+
+.granularity-chip {
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.granularity-chip.is-selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-soft);
+}
+
+.chart-wrap {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.chart-wrap svg { display: block; width: 100%; height: auto; }
+
+.chart-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin: 14px 0 22px;
+}
+
+.chart-stats .cs {
+  text-align: center;
+}
+
+.chart-stats .cs .k {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.chart-stats .cs .v {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.recommend-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+}
+
+.recommend-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.recommend-verdict {
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.recommend-verdict.band-strong, .recommend-verdict.band-attractive { color: var(--good); }
+.recommend-verdict.band-watch { color: var(--warn); }
+.recommend-verdict.band-cautious, .recommend-verdict.band-avoid { color: var(--bad); }
+
+.recommend-score {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.score-of100 {
+  font-size: 14px;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.recommend-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-muted);
+}
+
+.pill.risk-low { background: var(--good-soft); color: var(--good); }
+.pill.risk-medium { background: var(--warn-soft); color: var(--warn); }
+.pill.risk-high { background: var(--bad-soft); color: var(--bad); }
+
+.recommend-oneliner {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.section-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin: 36px 0 14px;
+}
+
+.section-label:first-of-type {
+  margin-top: 4px;
+}
+
+.trend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+
+.trend-row .metric { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.trend-row .detail { font-size: 13.5px; color: var(--text-muted); line-height: 1.45; }
+.trend-row .trend-body { flex: 1; }
+
+.trend-stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+  padding-left: 10px;
+}
+
+.trend-stat {
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.trend-stat.trend-up { color: var(--good); }
+.trend-stat.trend-down { color: var(--bad); }
+.trend-stat.trend-flat { color: var(--text-muted); }
+
+.trend-pill {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.trend-pill.trend-up { background: var(--good-soft); color: var(--good); }
+.trend-pill.trend-down { background: var(--bad-soft); color: var(--bad); }
+.trend-pill.trend-flat { background: var(--surface-soft); color: var(--text-muted); }
+
+.direction-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.direction-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 4px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-faint);
+  background: var(--surface-soft);
+  opacity: 0.55;
+}
+
+.direction-item .arrow {
+  font-size: 10px;
+}
+
+.direction-item.is-active {
+  opacity: 1;
+}
+
+.direction-item.up.is-active { background: var(--signal-up-fill); color: var(--signal-on); }
+.direction-item.steady.is-active { background: var(--invert-bg); color: var(--invert-text); }
+.direction-item.down.is-active { background: var(--signal-down-fill); color: var(--signal-on); }
+
+.scenario-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.scenario-col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 12px;
+  text-align: center;
+}
+
+.scenario-col.bear { border-top-color: var(--bad); }
+.scenario-col.base { border-top-color: var(--text-faint); }
+.scenario-col.bull { border-top-color: var(--good); }
+
+.scenario-col .label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+
+.scenario-col.bear .label { color: var(--bad); }
+.scenario-col.bull .label { color: var(--good); }
+
+.scenario-col .price {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.scenario-col .delta {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 2px 0 8px;
+}
+
+.scenario-col .note {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.two-col .col-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.two-col .col-title.catalysts { color: var(--good); }
+.two-col .col-title.risks { color: var(--bad); }
+
+.two-col ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.two-col li { margin-bottom: 6px; }
+
+.invalidation-box {
+  background: var(--warn-soft);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+
+.invalidation-box .col-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--warn);
+  margin-bottom: 8px;
+}
+
+.invalidation-box ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.news-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  gap: 12px;
+}
+
+.news-tag {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.news-body .title {
+  font-weight: 700;
+  font-size: 14.5px;
+  margin-bottom: 3px;
+}
+
+.news-body .date {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+
+.news-body .detail {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* ---------------- Key Financials Grid ---------------- */
+
+.financials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.financials-grid .fs {
+  text-align: center;
+  padding: 6px 2px;
+}
+
+.financials-grid .fs .k {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+
+.financials-grid .fs .v {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* ---------------- Hero recommendation module ---------------- */
+
+.hero-callout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hero-line {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hero-line .tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.hero-line.bull { background: var(--good-soft); }
+.hero-line.bull .tag { background: var(--good); color: #fff; }
+.hero-line.bear { background: var(--bad-soft); }
+.hero-line.bear .tag { background: var(--bad); color: #fff; }
+
+.risk-return-meter {
+  margin-bottom: 16px;
+}
+
+.rrm-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--good-soft), var(--warn-soft), var(--bad-soft));
+  margin: 22px 0 6px;
+}
+
+.rrm-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+.rrm-marker.opportunity { background: var(--accent); }
+.rrm-marker.risk { background: var(--text); }
+
+.rrm-marker .rrm-label {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.rrm-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.rrm-legend span { display: flex; align-items: center; gap: 4px; }
+
+.rrm-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+.rrm-dot.opportunity { background: var(--accent); }
+.rrm-dot.risk { background: var(--text); }
+
+.watchlist-cta {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid var(--invert-bg);
+  background: var(--invert-bg);
+  color: var(--invert-text);
+  margin-top: 4px;
+}
+
+.watchlist-cta.is-added {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* ---------------- Scenario matrix (interactive) ---------------- */
+
+.scenario-col {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.scenario-col:hover { transform: translateY(-1px); }
+
+.scenario-col.is-active {
+  box-shadow: var(--shadow);
+  border-width: 1px;
+}
+
+.scenario-col.is-active.bear { background: var(--bad-soft); }
+.scenario-col.is-active.base { background: var(--surface-soft); }
+.scenario-col.is-active.bull { background: var(--good-soft); }
+
+.scenario-col .target-label {
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+/* ---------------- Thesis check ---------------- */
+
+.thesis-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin-bottom: 24px;
+}
+
+.thesis-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.confidence-badge {
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.confidence-badge.conf-high { background: var(--good-soft); color: var(--good); }
+.confidence-badge.conf-medium { background: var(--warn-soft); color: var(--warn); }
+.confidence-badge.conf-speculative { background: var(--bad-soft); color: var(--bad); }
+
+.thesis-rationale {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.stoploss-line {
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.stoploss-line .stoploss-price {
+  font-weight: 800;
+  color: var(--bad);
+}
+
+.stoploss-note {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+.disclosure-footer {
+  padding: 14px 20px 24px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.detail-disclaimer {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  margin: 40px 0 4px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+</style>
+</head>
+<body>
+  <div class="app-brand">
+    <svg class="app-brand-icon" viewBox="0 0 20 20" aria-hidden="true">
+      <rect x="1" y="12" width="4" height="7" rx="1.5" />
+      <rect x="8" y="7" width="4" height="12" rx="1.5" />
+      <rect x="15" y="2" width="4" height="17" rx="1.5" />
+    </svg>
+    <span class="brand-mark">S&amp;P<span class="brand-num">20</span></span>
+    <span class="badge-demo">DEMO</span>
+  </div>
+
+  <div id="app">
+
+    <!-- Watchlist pane -->
+    <section id="pane-list" class="pane pane-list">
+      <div class="list-scroll">
+        <header class="list-header">
+          <div class="header-actions">
+            <span class="last-update" id="lastUpdate"></span>
+            <button class="icon-btn" id="alertsToggle" aria-label="Open alerts" title="Alerts">
+              <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 4a5 5 0 0 0-5 5c0 5.2-2 6.3-2 7.5h14c0-1.2-2-2.3-2-7.5a5 5 0 0 0-5-5z" />
+                <path d="M10.3 19.8a1.9 1.9 0 0 0 3.4 0" />
+                <path d="M16.3 5.6a3.2 3.2 0 0 1 1.4 2.6" opacity="0.7" />
+              </svg>
+              <span class="alerts-dot" id="alertsDot"></span>
+            </button>
+          </div>
+        </header>
+
+        <div class="list-toolbar">
+          <div class="section-title">Current Top 5</div>
+          <p class="shortlist-subtitle">The five strongest opportunities currently identified by S&amp;P 20.</p>
+          <p class="shortlist-caption">Updated as opportunities and risks change.</p>
+          <div class="timeframe-chips" id="timeframeChips"></div>
+          <p class="timeframe-lock-msg" id="timeframeLockMsg"></p>
+        </div>
+
+        <div class="watchlist" id="watchlist"></div>
+
+        <footer class="disclosure-footer" id="disclosureFooter"></footer>
+      </div>
+    </section>
+
+    <!-- Detail pane -->
+    <section id="pane-detail" class="pane pane-detail">
+      <div class="detail-scroll" id="detailScroll">
+        <div class="detail-header">
+          <button class="btn-back" id="btnBack">‹ Watchlist</button>
+        </div>
+        <div id="detailContent" class="detail-empty">
+          <p class="empty-msg">Select a company from the shortlist to see its full picture.</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="alerts-overlay" id="alertsOverlay">
+    <div class="alerts-panel">
+      <div class="alerts-panel-header">
+        <h2>Analysis Updates</h2>
+        <button class="icon-btn" id="alertsClose" aria-label="Close alerts">✕</button>
+      </div>
+      <p class="alerts-subtitle">Important changes identified by S&amp;P 20's analysis.</p>
+      <div class="alerts-list" id="alertsList"></div>
+    </div>
+  </div>
+
+  <script>
+const DATA = {"meta": {"productName": "S&P 20", "asOfDate": "2026-08-07", "lastUpdated": "2026-08-09T21:15:00-05:00", "dataMode": "demo", "periodLabel": "Trailing 6 Months", "disclosure": "Price and price-history data, and the Developments & News items, for NVDA, PLTR, DIS, JPM, LLY, XOM, and COST reflect real recent market data (source: Alpha Vantage, free tier, delayed / most recent trading days and news). All other companies (SOLR, NMBS, ANCR), along with every Opportunity Score, Risk level, Confidence rating, scenario price, key financial, catalyst, and risk item on this screen, remain fabricated demo data for product-prototype purposes only. Nothing here reflects real financial results or actual analysis of the named companies, and none of it should be used, quoted, or relied on as investment advice or research about a real security.", "timeframes": [{"id": "1w", "label": "1 Week", "locked": false}, {"id": "1m", "label": "1 Month", "locked": false}, {"id": "3m", "label": "3 Months", "locked": false}, {"id": "6m", "label": "6 Months", "locked": true}, {"id": "1y", "label": "1 Year", "locked": true}], "scoreBands": [{"min": 85, "max": 100, "label": "Strong Opportunity"}, {"min": 70, "max": 84, "label": "Attractive"}, {"min": 55, "max": 69, "label": "Watch"}, {"min": 40, "max": 54, "label": "Cautious"}, {"min": 0, "max": 39, "label": "Avoid For Now"}], "scoringMethodology": {"principle": "Opportunity, Risk, and Confidence are evaluated independently and are never combined into a single number.", "opportunityScore": {"question": "How attractive is this stock right now for the selected timeframe?", "scale": "0-100", "components": [{"name": "Business Momentum", "weight": 30, "description": "Whether the company's underlying business is getting stronger or weaker.", "examples": ["Revenue growth", "Earnings growth", "Margin improvement", "Free cash flow", "Management guidance", "Customer or sales growth"]}, {"name": "Catalysts", "weight": 25, "description": "Upcoming or recent events that could materially move the stock.", "examples": ["Earnings", "New contracts", "Product launches", "Partnerships", "Regulatory decisions", "New markets", "Positive changes in guidance"]}, {"name": "Valuation & Price Level", "weight": 25, "description": "Whether the current price is attractive relative to the company's fundamentals and future potential.", "examples": ["P/E", "PEG", "FCF yield", "Historical valuation", "Current price vs. recent high/low", "Current price vs. expected scenario value"]}, {"name": "Market & Price Momentum", "weight": 20, "description": "What the market is currently saying about the stock.", "examples": ["Price trend", "Relative performance vs. S&P 500", "Strength vs. sector", "Trading volume", "Recent support/resistance behavior"]}], "note": "Levels/bands for the resulting score already live in meta.scoreBands."}, "riskLevel": {"question": "How much uncertainty or downside exists if the investment thesis is wrong?", "scale": ["Low", "Medium", "High"], "note": "Risk does not automatically lower the Opportunity Score - it is shown separately.", "levels": {"Low": "Stable business, strong financial position, and relatively limited downside uncertainty.", "Medium": "Good opportunity, but meaningful factors could negatively affect performance.", "High": "Large potential upside may exist, but uncertainty, volatility, or downside exposure is significant."}, "factors": ["Price volatility", "Valuation risk", "Debt and balance-sheet strength", "Cash-flow stability", "Customer concentration", "Competitive pressure", "Regulatory risk", "Earnings/event risk", "Downside in the Bear Case", "Dependence on one product, customer, or market", "Macro sensitivity"]}, "confidence": {"question": "How strong is the evidence supporting this analysis?", "scale": ["High", "Medium", "Speculative"], "levels": {"High": "Strong and consistent evidence from several sources.", "Medium": "The thesis is supported, but important uncertainties remain.", "Speculative": "Early signals exist, but there is not enough evidence yet."}}, "productRule": "Never combine Opportunity, Risk, and Confidence into one number. The user should always be able to answer: Is this a good opportunity? How risky is it? How confident are we?"}, "priceDataSource": {"provider": "Alpha Vantage (free tier)", "coverage": "NVDA, PLTR, DIS, JPM, LLY, XOM, COST", "window": "~100 most recent trading days (2026-03-17 to 2026-08-07)", "note": "6M and 1Y timeframes are locked in the UI because real history beyond this window requires a paid tier."}, "newsDataSource": {"provider": "Alpha Vantage NEWS_SENTIMENT (free tier)", "coverage": "NVDA, PLTR, DIS, JPM, LLY, XOM, COST", "selection": "Top 3 articles per company by ticker-specific relevance score, pulled 2026-08-09.", "note": "Developments & News for SOLR, NMBS, and ANCR remain fabricated, since these are fictional companies with no real news to pull."}}, "companies": [{"id": "solara", "ticker": "SOLR", "name": "Solara Dynamics", "archetype": "growth_leader", "archetypeLabel": "Growth Leader", "sector": "Cloud Infrastructure & AI", "oneLiner": "A fast-scaling cloud infrastructure provider riding accelerating enterprise AI adoption.", "price": {"current": 214.32, "periodHigh": 214.32, "periodLow": 184.87, "percentChange": 14.6, "relativePerformance": 9.2}, "byTimeframe": {"1w": {"opportunityScore": 74, "risk": "Medium", "confidence": "Medium", "scenarios": {"bear": {"price": 205, "note": "Broad tech pullback pressures high-multiple names."}, "base": {"price": 217, "note": "Trades in line with recent range on no major news."}, "bull": {"price": 226, "note": "Positive analyst commentary ahead of earnings."}}, "targetLabel": "1-2 Week Target"}, "1m": {"opportunityScore": 79, "risk": "Medium", "confidence": "Medium", "scenarios": {"bear": {"price": 198, "note": "Guidance disappoints or margins come in soft."}, "base": {"price": 224, "note": "Steady execution consistent with recent trend."}, "bull": {"price": 244, "note": "New enterprise contracts announced."}}, "targetLabel": "1 Month Target"}, "3m": {"opportunityScore": 84, "risk": "Medium", "confidence": "High", "scenarios": {"bear": {"price": 190, "note": "Capacity spending weighs on free cash flow."}, "base": {"price": 238, "note": "Revenue growth continues near current pace."}, "bull": {"price": 270, "note": "Multiple quarters of raised guidance re-rate the stock."}}, "targetLabel": "3 Month Target"}, "6m": {"opportunityScore": 87, "risk": "Low", "confidence": "High", "scenarios": {"bear": {"price": 185, "note": "Competitive pressure from larger cloud providers intensifies."}, "base": {"price": 255, "note": "Enterprise AI demand continues to convert into contracts."}, "bull": {"price": 300, "note": "New data-center regions come online ahead of schedule."}}, "targetLabel": "6-9 Month Target"}, "1y": {"opportunityScore": 89, "risk": "Low", "confidence": "High", "scenarios": {"bear": {"price": 175, "note": "A broader AI infrastructure spending slowdown emerges."}, "base": {"price": 285, "note": "Growth and margin trends continue on current trajectory."}, "bull": {"price": 360, "note": "Company becomes a primary infrastructure partner for multiple large AI platforms."}}, "targetLabel": "12 Month Target"}}, "evidence": {"developments": [{"title": "Signed multi-year cloud capacity agreements with two additional Fortune 500 customers", "detail": "Extends the company's largest customer cohort and adds multi-year revenue visibility.", "date": "2026-07-14"}, {"title": "Expanded AI-training data center footprint in the Midwest", "detail": "Added roughly 30% more compute capacity to meet enterprise AI training demand.", "date": "2026-06-22"}, {"title": "Raised full-year revenue guidance for the second consecutive quarter", "detail": "Management cited stronger-than-expected enterprise adoption of its AI training platform.", "date": "2026-07-29"}], "financialTrends": [{"metric": "Revenue Growth (YoY)", "trend": "up", "detail": "Accelerated to 34% from 27% last quarter, driven by enterprise contract wins.", "stat": "34%"}, {"metric": "Gross Margin", "trend": "up", "detail": "Expanded to 68% as data-center utilization improves with scale.", "stat": "68%"}, {"metric": "Free Cash Flow", "trend": "up", "detail": "Turned solidly positive for the third straight quarter.", "stat": "Positive"}, {"metric": "Customer Retention", "trend": "flat", "detail": "Net revenue retention holding steady near 118%.", "stat": "118%"}, {"metric": "R&D Spend (% of Revenue)", "trend": "up", "detail": "Increased investment in next-generation AI chips, pressuring near-term margins slightly.", "stat": "22%"}], "catalysts": ["Additional enterprise AI contract announcements expected next quarter", "Potential new data-center region launch", "Analyst day scheduled to detail multi-year capacity roadmap"], "risks": ["Heavy capital spending could pressure near-term free cash flow if demand slows", "Increasing competition from larger cloud providers entering the same niche", "Customer concentration among a small number of large enterprise clients"], "invalidation": ["Revenue growth decelerates below 20% for two consecutive quarters", "A top-5 customer publicly cancels or significantly reduces its contract", "Gross margin contracts instead of expanding for two straight quarters"]}, "priceHistory": [{"d": -252, "p": 162.62}, {"d": -251, "p": 159.69}, {"d": -250, "p": 160.12}, {"d": -249, "p": 161.83}, {"d": -248, "p": 160.4}, {"d": -247, "p": 157.29}, {"d": -246, "p": 156.8}, {"d": -245, "p": 157.42}, {"d": -244, "p": 159.33}, {"d": -243, "p": 156.47}, {"d": -242, "p": 153.52}, {"d": -241, "p": 154.58}, {"d": -240, "p": 155.19}, {"d": -239, "p": 157.95}, {"d": -238, "p": 159.62}, {"d": -237, "p": 159.05}, {"d": -236, "p": 158.13}, {"d": -235, "p": 163.13}, {"d": -234, "p": 162.15}, {"d": -233, "p": 160.14}, {"d": -232, "p": 157.44}, {"d": -231, "p": 157.27}, {"d": -230, "p": 157.22}, {"d": -229, "p": 156.16}, {"d": -228, "p": 155.68}, {"d": -227, "p": 155.88}, {"d": -226, "p": 156.94}, {"d": -225, "p": 158.83}, {"d": -224, "p": 158.9}, {"d": -223, "p": 154.9}, {"d": -222, "p": 155.96}, {"d": -221, "p": 152.77}, {"d": -220, "p": 152.08}, {"d": -219, "p": 148.86}, {"d": -218, "p": 148.53}, {"d": -217, "p": 146.7}, {"d": -216, "p": 146.77}, {"d": -215, "p": 152.86}, {"d": -214, "p": 152.42}, {"d": -213, "p": 153.75}, {"d": -212, "p": 150.79}, {"d": -211, "p": 149.88}, {"d": -210, "p": 150.84}, {"d": -209, "p": 150.32}, {"d": -208, "p": 150.7}, {"d": -207, "p": 150.56}, {"d": -206, "p": 148.27}, {"d": -205, "p": 149.02}, {"d": -204, "p": 147.12}, {"d": -203, "p": 150.41}, {"d": -202, "p": 149.09}, {"d": -201, "p": 150.08}, {"d": -200, "p": 149.75}, {"d": -199, "p": 151.27}, {"d": -198, "p": 149.75}, {"d": -197, "p": 151.37}, {"d": -196, "p": 150.78}, {"d": -195, "p": 152.93}, {"d": -194, "p": 153.83}, {"d": -193, "p": 153.76}, {"d": -192, "p": 151.87}, {"d": -191, "p": 153.04}, {"d": -190, "p": 153.63}, {"d": -189, "p": 156.59}, {"d": -188, "p": 155.47}, {"d": -187, "p": 156.24}, {"d": -186, "p": 156.92}, {"d": -185, "p": 157.15}, {"d": -184, "p": 157.22}, {"d": -183, "p": 157.23}, {"d": -182, "p": 155.66}, {"d": -181, "p": 153.28}, {"d": -180, "p": 152.14}, {"d": -179, "p": 152.97}, {"d": -178, "p": 155.65}, {"d": -177, "p": 157.28}, {"d": -176, "p": 159.09}, {"d": -175, "p": 160.35}, {"d": -174, "p": 161.44}, {"d": -173, "p": 161.46}, {"d": -172, "p": 162.72}, {"d": -171, "p": 166.14}, {"d": -170, "p": 165.06}, {"d": -169, "p": 163.21}, {"d": -168, "p": 167.04}, {"d": -167, "p": 167.2}, {"d": -166, "p": 168.94}, {"d": -165, "p": 170.48}, {"d": -164, "p": 167.6}, {"d": -163, "p": 172.6}, {"d": -162, "p": 176.23}, {"d": -161, "p": 176.24}, {"d": -160, "p": 177.57}, {"d": -159, "p": 177.46}, {"d": -158, "p": 175.04}, {"d": -157, "p": 174.39}, {"d": -156, "p": 174.84}, {"d": -155, "p": 176.99}, {"d": -154, "p": 178.23}, {"d": -153, "p": 177.96}, {"d": -152, "p": 180.72}, {"d": -151, "p": 178.53}, {"d": -150, "p": 179.98}, {"d": -149, "p": 182.18}, {"d": -148, "p": 181.08}, {"d": -147, "p": 176.52}, {"d": -146, "p": 174.06}, {"d": -145, "p": 174.2}, {"d": -144, "p": 175.0}, {"d": -143, "p": 178.16}, {"d": -142, "p": 175.45}, {"d": -141, "p": 175.06}, {"d": -140, "p": 176.14}, {"d": -139, "p": 175.38}, {"d": -138, "p": 169.68}, {"d": -137, "p": 171.08}, {"d": -136, "p": 175.9}, {"d": -135, "p": 177.81}, {"d": -134, "p": 175.3}, {"d": -133, "p": 173.97}, {"d": -132, "p": 174.08}, {"d": -131, "p": 179.4}, {"d": -130, "p": 180.44}, {"d": -129, "p": 180.3}, {"d": -128, "p": 183.57}, {"d": -127, "p": 182.96}, {"d": -126, "p": 187.02}, {"d": -125, "p": 185.69}, {"d": -124, "p": 184.87}, {"d": -123, "p": 186.94}, {"d": -122, "p": 190.77}, {"d": -121, "p": 192.74}, {"d": -120, "p": 193.84}, {"d": -119, "p": 189.64}, {"d": -118, "p": 188.22}, {"d": -117, "p": 187.06}, {"d": -116, "p": 186.1}, {"d": -115, "p": 187.85}, {"d": -114, "p": 187.37}, {"d": -113, "p": 189.63}, {"d": -112, "p": 190.17}, {"d": -111, "p": 189.68}, {"d": -110, "p": 190.31}, {"d": -109, "p": 191.71}, {"d": -108, "p": 194.21}, {"d": -107, "p": 193.35}, {"d": -106, "p": 193.1}, {"d": -105, "p": 190.05}, {"d": -104, "p": 194.39}, {"d": -103, "p": 198.45}, {"d": -102, "p": 198.34}, {"d": -101, "p": 197.46}, {"d": -100, "p": 194.65}, {"d": -99, "p": 195.43}, {"d": -98, "p": 196.3}, {"d": -97, "p": 202.3}, {"d": -96, "p": 203.31}, {"d": -95, "p": 201.62}, {"d": -94, "p": 195.66}, {"d": -93, "p": 199.63}, {"d": -92, "p": 200.48}, {"d": -91, "p": 196.67}, {"d": -90, "p": 197.48}, {"d": -89, "p": 193.74}, {"d": -88, "p": 203.06}, {"d": -87, "p": 206.4}, {"d": -86, "p": 208.31}, {"d": -85, "p": 208.21}, {"d": -84, "p": 202.85}, {"d": -83, "p": 202.88}, {"d": -82, "p": 199.17}, {"d": -81, "p": 201.08}, {"d": -80, "p": 195.91}, {"d": -79, "p": 193.95}, {"d": -78, "p": 197.4}, {"d": -77, "p": 202.02}, {"d": -76, "p": 199.29}, {"d": -75, "p": 195.7}, {"d": -74, "p": 198.3}, {"d": -73, "p": 200.87}, {"d": -72, "p": 198.66}, {"d": -71, "p": 197.22}, {"d": -70, "p": 195.8}, {"d": -69, "p": 193.14}, {"d": -68, "p": 191.77}, {"d": -67, "p": 195.26}, {"d": -66, "p": 197.37}, {"d": -65, "p": 203.08}, {"d": -64, "p": 203.21}, {"d": -63, "p": 203.21}, {"d": -62, "p": 200.98}, {"d": -61, "p": 201.02}, {"d": -60, "p": 197.96}, {"d": -59, "p": 193.78}, {"d": -58, "p": 195.89}, {"d": -57, "p": 199.95}, {"d": -56, "p": 202.49}, {"d": -55, "p": 206.4}, {"d": -54, "p": 207.44}, {"d": -53, "p": 205.88}, {"d": -52, "p": 206.47}, {"d": -51, "p": 205.83}, {"d": -50, "p": 203.24}, {"d": -49, "p": 199.17}, {"d": -48, "p": 195.71}, {"d": -47, "p": 196.04}, {"d": -46, "p": 196.78}, {"d": -45, "p": 195.91}, {"d": -44, "p": 199.94}, {"d": -43, "p": 200.76}, {"d": -42, "p": 202.64}, {"d": -41, "p": 206.24}, {"d": -40, "p": 204.42}, {"d": -39, "p": 199.6}, {"d": -38, "p": 201.92}, {"d": -37, "p": 200.47}, {"d": -36, "p": 204.28}, {"d": -35, "p": 205.54}, {"d": -34, "p": 208.62}, {"d": -33, "p": 211.07}, {"d": -32, "p": 205.8}, {"d": -31, "p": 208.1}, {"d": -30, "p": 206.65}, {"d": -29, "p": 204.99}, {"d": -28, "p": 204.2}, {"d": -27, "p": 206.61}, {"d": -26, "p": 209.37}, {"d": -25, "p": 212.52}, {"d": -24, "p": 208.35}, {"d": -23, "p": 207.12}, {"d": -22, "p": 201.18}, {"d": -21, "p": 201.27}, {"d": -20, "p": 203.2}, {"d": -19, "p": 201.55}, {"d": -18, "p": 202.55}, {"d": -17, "p": 203.52}, {"d": -16, "p": 206.57}, {"d": -15, "p": 204.73}, {"d": -14, "p": 202.9}, {"d": -13, "p": 201.25}, {"d": -12, "p": 206.25}, {"d": -11, "p": 209.57}, {"d": -10, "p": 209.6}, {"d": -9, "p": 210.59}, {"d": -8, "p": 211.27}, {"d": -7, "p": 212.21}, {"d": -6, "p": 212.01}, {"d": -5, "p": 211.46}, {"d": -4, "p": 208.4}, {"d": -3, "p": 207.04}, {"d": -2, "p": 211.9}, {"d": -1, "p": 213.76}, {"d": 0, "p": 214.32}], "keyFinancials": {"marketCap": "$38B", "peRatio": 61.0, "revenueGrowthYoY": 34.0, "grossMargin": 68.0, "fcfYield": 1.1, "dividendYield": 0.0}, "conclusionReason": "accelerating enterprise demand and expanding margins", "shortlist": {"status": "under_review", "rank": null, "addedDate": null, "selectionReason": null, "replacementNote": null}}, {"id": "nimbus", "ticker": "NMBS", "name": "Nimbus Robotics", "archetype": "emerging_opportunity", "archetypeLabel": "Emerging Opportunity", "sector": "Industrial Automation & Robotics", "oneLiner": "An early-stage industrial robotics company showing its first signs of commercial traction after years of R&D.", "price": {"current": 38.15, "periodHigh": 39.92, "periodLow": 26.37, "percentChange": 26.3, "relativePerformance": 20.9}, "byTimeframe": {"1w": {"opportunityScore": 61, "risk": "High", "confidence": "Low", "scenarios": {"bear": {"price": 33, "note": "Profit-taking after a sharp recent run-up."}, "base": {"price": 39, "note": "Trades sideways awaiting next contract news."}, "bull": {"price": 45, "note": "Positive coverage following a new pilot announcement."}}, "targetLabel": "1-2 Week Target"}, "1m": {"opportunityScore": 65, "risk": "High", "confidence": "Low", "scenarios": {"bear": {"price": 29, "note": "A pilot program stalls or is delayed."}, "base": {"price": 42, "note": "Backlog growth continues at a similar pace."}, "bull": {"price": 52, "note": "A new strategic partnership is announced."}}, "targetLabel": "1 Month Target"}, "3m": {"opportunityScore": 70, "risk": "High", "confidence": "Medium", "scenarios": {"bear": {"price": 24, "note": "Cash burn concerns resurface without a financing update."}, "base": {"price": 48, "note": "First commercial contracts continue ramping as expected."}, "bull": {"price": 66, "note": "A pilot customer expands to a multi-facility rollout."}}, "targetLabel": "3 Month Target"}, "6m": {"opportunityScore": 74, "risk": "Medium", "confidence": "Medium", "scenarios": {"bear": {"price": 20, "note": "Company needs dilutive financing sooner than expected."}, "base": {"price": 55, "note": "Gross margin continues improving as scale increases."}, "bull": {"price": 82, "note": "Backlog conversion accelerates and margins turn durably positive."}}, "targetLabel": "6-9 Month Target"}, "1y": {"opportunityScore": 77, "risk": "Medium", "confidence": "Medium", "scenarios": {"bear": {"price": 18, "note": "Competitive entrants undercut pricing before Nimbus reaches scale."}, "base": {"price": 65, "note": "Commercial ramp continues on its current trajectory."}, "bull": {"price": 105, "note": "Nimbus becomes a preferred vendor across multiple large manufacturers."}}, "targetLabel": "12 Month Target"}}, "evidence": {"developments": [{"title": "Won first multi-facility deployment contract with a mid-size automotive parts manufacturer", "detail": "First contract of this scale for the company, validating its commercial-readiness thesis.", "date": "2026-07-08"}, {"title": "Announced strategic partnership to co-develop warehouse-picking robotics", "detail": "Partnership with a logistics software firm opens a new addressable market.", "date": "2026-06-30"}, {"title": "Reported first quarter of positive gross margin since going public", "detail": "Gross margin turned positive at 12%, an early proof point for the business model.", "date": "2026-07-25"}], "financialTrends": [{"metric": "Revenue Growth (YoY)", "trend": "up", "detail": "Grew 58% off a small base as first commercial contracts ramp.", "stat": "58%"}, {"metric": "Gross Margin", "trend": "up", "detail": "Turned positive for the first time, reaching 12%.", "stat": "12%"}, {"metric": "Cash Runway", "trend": "down", "detail": "Roughly 18 months at current burn rate absent new financing.", "stat": "18 mo"}, {"metric": "Backlog / Bookings", "trend": "up", "detail": "Order backlog more than doubled quarter over quarter.", "stat": "2.1x"}, {"metric": "Operating Expenses", "trend": "flat", "detail": "Held roughly steady as the company prioritizes efficiency ahead of scaling.", "stat": "Flat"}], "catalysts": ["Conversion of current pilot programs into multi-year contracts", "Potential additional strategic partnership announcements", "Continued progress toward breakeven gross margin"], "risks": ["Still cash-flow negative and may need to raise additional capital, risking dilution", "Revenue depends on a small number of early customers", "Unproven ability to scale manufacturing and service capacity"], "invalidation": ["Company announces a dilutive emergency capital raise", "A flagship pilot customer fails to convert to a full contract", "Cash runway falls below 6 months without a clear financing plan"]}, "priceHistory": [{"d": -252, "p": 28.77}, {"d": -251, "p": 29.14}, {"d": -250, "p": 29.0}, {"d": -249, "p": 31.81}, {"d": -248, "p": 32.23}, {"d": -247, "p": 32.37}, {"d": -246, "p": 32.73}, {"d": -245, "p": 32.24}, {"d": -244, "p": 31.59}, {"d": -243, "p": 32.02}, {"d": -242, "p": 31.61}, {"d": -241, "p": 32.28}, {"d": -240, "p": 32.06}, {"d": -239, "p": 30.51}, {"d": -238, "p": 29.41}, {"d": -237, "p": 28.71}, {"d": -236, "p": 27.17}, {"d": -235, "p": 27.08}, {"d": -234, "p": 26.84}, {"d": -233, "p": 27.51}, {"d": -232, "p": 26.84}, {"d": -231, "p": 26.65}, {"d": -230, "p": 27.04}, {"d": -229, "p": 27.57}, {"d": -228, "p": 26.78}, {"d": -227, "p": 27.89}, {"d": -226, "p": 27.39}, {"d": -225, "p": 28.27}, {"d": -224, "p": 28.02}, {"d": -223, "p": 27.67}, {"d": -222, "p": 26.72}, {"d": -221, "p": 26.61}, {"d": -220, "p": 28.37}, {"d": -219, "p": 27.85}, {"d": -218, "p": 29.02}, {"d": -217, "p": 30.06}, {"d": -216, "p": 29.71}, {"d": -215, "p": 30.6}, {"d": -214, "p": 31.75}, {"d": -213, "p": 31.46}, {"d": -212, "p": 30.97}, {"d": -211, "p": 31.9}, {"d": -210, "p": 32.18}, {"d": -209, "p": 34.07}, {"d": -208, "p": 34.45}, {"d": -207, "p": 33.35}, {"d": -206, "p": 33.28}, {"d": -205, "p": 32.19}, {"d": -204, "p": 32.83}, {"d": -203, "p": 33.44}, {"d": -202, "p": 33.03}, {"d": -201, "p": 32.21}, {"d": -200, "p": 32.98}, {"d": -199, "p": 32.61}, {"d": -198, "p": 33.69}, {"d": -197, "p": 32.77}, {"d": -196, "p": 32.5}, {"d": -195, "p": 31.99}, {"d": -194, "p": 31.07}, {"d": -193, "p": 33.43}, {"d": -192, "p": 34.97}, {"d": -191, "p": 34.35}, {"d": -190, "p": 35.07}, {"d": -189, "p": 33.36}, {"d": -188, "p": 34.49}, {"d": -187, "p": 35.49}, {"d": -186, "p": 35.13}, {"d": -185, "p": 34.77}, {"d": -184, "p": 34.97}, {"d": -183, "p": 35.38}, {"d": -182, "p": 35.01}, {"d": -181, "p": 34.17}, {"d": -180, "p": 33.9}, {"d": -179, "p": 33.48}, {"d": -178, "p": 34.18}, {"d": -177, "p": 34.23}, {"d": -176, "p": 34.43}, {"d": -175, "p": 32.87}, {"d": -174, "p": 32.51}, {"d": -173, "p": 32.14}, {"d": -172, "p": 31.66}, {"d": -171, "p": 31.54}, {"d": -170, "p": 31.26}, {"d": -169, "p": 29.96}, {"d": -168, "p": 30.72}, {"d": -167, "p": 31.48}, {"d": -166, "p": 31.02}, {"d": -165, "p": 31.53}, {"d": -164, "p": 30.72}, {"d": -163, "p": 29.66}, {"d": -162, "p": 29.48}, {"d": -161, "p": 30.74}, {"d": -160, "p": 30.64}, {"d": -159, "p": 29.37}, {"d": -158, "p": 29.55}, {"d": -157, "p": 29.08}, {"d": -156, "p": 28.5}, {"d": -155, "p": 28.77}, {"d": -154, "p": 27.42}, {"d": -153, "p": 26.1}, {"d": -152, "p": 25.08}, {"d": -151, "p": 25.82}, {"d": -150, "p": 25.89}, {"d": -149, "p": 25.46}, {"d": -148, "p": 24.99}, {"d": -147, "p": 25.44}, {"d": -146, "p": 26.32}, {"d": -145, "p": 25.81}, {"d": -144, "p": 26.0}, {"d": -143, "p": 27.73}, {"d": -142, "p": 28.2}, {"d": -141, "p": 27.95}, {"d": -140, "p": 28.22}, {"d": -139, "p": 28.31}, {"d": -138, "p": 28.84}, {"d": -137, "p": 29.13}, {"d": -136, "p": 28.75}, {"d": -135, "p": 28.66}, {"d": -134, "p": 28.97}, {"d": -133, "p": 28.44}, {"d": -132, "p": 28.51}, {"d": -131, "p": 27.81}, {"d": -130, "p": 28.78}, {"d": -129, "p": 30.04}, {"d": -128, "p": 29.35}, {"d": -127, "p": 30.05}, {"d": -126, "p": 30.21}, {"d": -125, "p": 30.4}, {"d": -124, "p": 30.3}, {"d": -123, "p": 30.64}, {"d": -122, "p": 31.61}, {"d": -121, "p": 30.68}, {"d": -120, "p": 31.66}, {"d": -119, "p": 31.56}, {"d": -118, "p": 30.74}, {"d": -117, "p": 30.82}, {"d": -116, "p": 31.48}, {"d": -115, "p": 31.52}, {"d": -114, "p": 31.89}, {"d": -113, "p": 31.72}, {"d": -112, "p": 31.38}, {"d": -111, "p": 32.37}, {"d": -110, "p": 31.68}, {"d": -109, "p": 32.67}, {"d": -108, "p": 33.1}, {"d": -107, "p": 32.98}, {"d": -106, "p": 32.9}, {"d": -105, "p": 32.77}, {"d": -104, "p": 32.86}, {"d": -103, "p": 32.95}, {"d": -102, "p": 32.95}, {"d": -101, "p": 31.38}, {"d": -100, "p": 29.74}, {"d": -99, "p": 30.14}, {"d": -98, "p": 29.74}, {"d": -97, "p": 29.4}, {"d": -96, "p": 29.38}, {"d": -95, "p": 28.62}, {"d": -94, "p": 29.96}, {"d": -93, "p": 30.07}, {"d": -92, "p": 30.04}, {"d": -91, "p": 29.31}, {"d": -90, "p": 30.14}, {"d": -89, "p": 30.85}, {"d": -88, "p": 32.24}, {"d": -87, "p": 33.16}, {"d": -86, "p": 32.57}, {"d": -85, "p": 31.59}, {"d": -84, "p": 32.91}, {"d": -83, "p": 32.44}, {"d": -82, "p": 32.47}, {"d": -81, "p": 32.46}, {"d": -80, "p": 33.03}, {"d": -79, "p": 33.65}, {"d": -78, "p": 32.85}, {"d": -77, "p": 32.42}, {"d": -76, "p": 31.05}, {"d": -75, "p": 31.65}, {"d": -74, "p": 31.63}, {"d": -73, "p": 30.35}, {"d": -72, "p": 31.33}, {"d": -71, "p": 31.46}, {"d": -70, "p": 30.74}, {"d": -69, "p": 30.51}, {"d": -68, "p": 30.15}, {"d": -67, "p": 30.36}, {"d": -66, "p": 30.65}, {"d": -65, "p": 30.29}, {"d": -64, "p": 30.76}, {"d": -63, "p": 28.8}, {"d": -62, "p": 28.65}, {"d": -61, "p": 29.27}, {"d": -60, "p": 30.15}, {"d": -59, "p": 30.92}, {"d": -58, "p": 30.19}, {"d": -57, "p": 28.96}, {"d": -56, "p": 28.81}, {"d": -55, "p": 30.75}, {"d": -54, "p": 31.09}, {"d": -53, "p": 30.6}, {"d": -52, "p": 29.36}, {"d": -51, "p": 29.59}, {"d": -50, "p": 29.35}, {"d": -49, "p": 29.86}, {"d": -48, "p": 30.13}, {"d": -47, "p": 28.4}, {"d": -46, "p": 28.41}, {"d": -45, "p": 29.13}, {"d": -44, "p": 28.78}, {"d": -43, "p": 27.98}, {"d": -42, "p": 27.22}, {"d": -41, "p": 26.37}, {"d": -40, "p": 28.06}, {"d": -39, "p": 29.25}, {"d": -38, "p": 28.88}, {"d": -37, "p": 30.07}, {"d": -36, "p": 29.34}, {"d": -35, "p": 29.02}, {"d": -34, "p": 28.55}, {"d": -33, "p": 28.51}, {"d": -32, "p": 29.12}, {"d": -31, "p": 30.85}, {"d": -30, "p": 31.57}, {"d": -29, "p": 31.59}, {"d": -28, "p": 31.84}, {"d": -27, "p": 31.76}, {"d": -26, "p": 32.19}, {"d": -25, "p": 31.56}, {"d": -24, "p": 31.89}, {"d": -23, "p": 32.39}, {"d": -22, "p": 33.33}, {"d": -21, "p": 32.72}, {"d": -20, "p": 33.21}, {"d": -19, "p": 33.57}, {"d": -18, "p": 32.97}, {"d": -17, "p": 31.38}, {"d": -16, "p": 31.03}, {"d": -15, "p": 31.87}, {"d": -14, "p": 31.74}, {"d": -13, "p": 33.84}, {"d": -12, "p": 34.46}, {"d": -11, "p": 33.92}, {"d": -10, "p": 33.95}, {"d": -9, "p": 34.48}, {"d": -8, "p": 35.05}, {"d": -7, "p": 34.94}, {"d": -6, "p": 35.49}, {"d": -5, "p": 38.53}, {"d": -4, "p": 39.61}, {"d": -3, "p": 39.92}, {"d": -2, "p": 39.55}, {"d": -1, "p": 37.85}, {"d": 0, "p": 38.15}], "keyFinancials": {"marketCap": "$2.4B", "peRatio": null, "revenueGrowthYoY": 58.0, "grossMargin": 12.0, "fcfYield": -3.2, "dividendYield": 0.0}, "conclusionReason": "an improving margin trend, though still early-stage", "shortlist": {"status": "under_review", "rank": null, "addedDate": null, "selectionReason": null, "replacementNote": null}}, {"id": "anchorline", "ticker": "ANCR", "name": "Anchorline Retail Group", "archetype": "turnaround", "archetypeLabel": "Turnaround Candidate", "sector": "Specialty Retail", "oneLiner": "A legacy specialty retailer in the second year of a cost-cutting and e-commerce turnaround plan.", "price": {"current": 11.42, "periodHigh": 13.45, "periodLow": 10.99, "percentChange": -5.4, "relativePerformance": -10.8}, "byTimeframe": {"1w": {"opportunityScore": 42, "risk": "High", "confidence": "Low", "scenarios": {"bear": {"price": 9, "note": "Weak weekly foot-traffic data weighs on sentiment."}, "base": {"price": 11.5, "note": "Trades in line with recent range."}, "bull": {"price": 14, "note": "Short-covering rally on turnaround optimism."}}, "targetLabel": "1-2 Week Target"}, "1m": {"opportunityScore": 45, "risk": "High", "confidence": "Low", "scenarios": {"bear": {"price": 8, "note": "Same-store sales decline fails to narrow as expected."}, "base": {"price": 12.5, "note": "Cost cuts and store closures proceed on plan."}, "bull": {"price": 16, "note": "Early signs of e-commerce mix gains outpace expectations."}}, "targetLabel": "1 Month Target"}, "3m": {"opportunityScore": 51, "risk": "High", "confidence": "Medium", "scenarios": {"bear": {"price": 7, "note": "Balance sheet stress resurfaces despite refinancing."}, "base": {"price": 14, "note": "Operating margin keeps improving gradually."}, "bull": {"price": 19, "note": "Same-store sales approach flat ahead of schedule."}}, "targetLabel": "3 Month Target"}, "6m": {"opportunityScore": 58, "risk": "Medium", "confidence": "Medium", "scenarios": {"bear": {"price": 6, "note": "New management departs or execution stalls."}, "base": {"price": 16, "note": "Turnaround plan continues on its current pace."}, "bull": {"price": 23, "note": "Debt reduction and margin gains both beat plan."}}, "targetLabel": "6-9 Month Target"}, "1y": {"opportunityScore": 63, "risk": "Medium", "confidence": "Medium", "scenarios": {"bear": {"price": 5, "note": "Sales base keeps shrinking faster than costs can be cut."}, "base": {"price": 19, "note": "Company reaches breakeven operating margin."}, "bull": {"price": 28, "note": "Turnaround is substantially complete and profitability is restored."}}, "targetLabel": "12 Month Target"}}, "evidence": {"developments": [{"title": "Closed 40 underperforming stores ahead of schedule", "detail": "Part of the footprint-reduction plan aimed at concentrating investment in stronger locations.", "date": "2026-07-10"}, {"title": "New CEO with e-commerce turnaround experience completed her first full quarter", "detail": "Early strategic priorities include digital investment and further cost discipline.", "date": "2026-07-01"}, {"title": "Refinanced a portion of near-term debt maturities", "detail": "Pushed out the company's earliest debt maturity by two years, easing near-term balance-sheet pressure.", "date": "2026-06-18"}], "financialTrends": [{"metric": "Same-Store Sales", "trend": "down", "detail": "Declined 3% year over year, though the pace of decline has slowed for two straight quarters.", "stat": "-3%"}, {"metric": "Operating Margin", "trend": "up", "detail": "Improved from -4% to -1% as cost cuts take hold.", "stat": "-1%"}, {"metric": "Net Debt", "trend": "down", "detail": "Reduced by roughly 15% following asset sales and refinancing.", "stat": "-15%"}, {"metric": "E-commerce Mix", "trend": "up", "detail": "Grew to 22% of total sales from 15% a year ago.", "stat": "22%"}, {"metric": "Inventory Turnover", "trend": "up", "detail": "Improved as the company clears aged inventory from closed stores.", "stat": "Improving"}], "catalysts": ["Continued narrowing of same-store sales declines toward flat", "Additional debt reduction or refinancing", "E-commerce mix continuing to grow as a share of total sales"], "risks": ["Overall sales base still shrinking as store closures continue", "Execution risk under a still-new management team", "Highly leveraged balance sheet leaves little room for missteps"], "invalidation": ["Same-store sales decline re-accelerates rather than continuing to narrow", "Company misses a debt covenant or restructures again", "CEO or other key turnaround leadership departs within the year"]}, "priceHistory": [{"d": -252, "p": 16.1}, {"d": -251, "p": 15.68}, {"d": -250, "p": 15.47}, {"d": -249, "p": 15.56}, {"d": -248, "p": 15.32}, {"d": -247, "p": 14.94}, {"d": -246, "p": 14.42}, {"d": -245, "p": 14.57}, {"d": -244, "p": 14.45}, {"d": -243, "p": 14.21}, {"d": -242, "p": 13.88}, {"d": -241, "p": 13.17}, {"d": -240, "p": 13.14}, {"d": -239, "p": 12.85}, {"d": -238, "p": 12.79}, {"d": -237, "p": 13.12}, {"d": -236, "p": 12.98}, {"d": -235, "p": 12.9}, {"d": -234, "p": 13.1}, {"d": -233, "p": 13.0}, {"d": -232, "p": 13.0}, {"d": -231, "p": 12.66}, {"d": -230, "p": 12.39}, {"d": -229, "p": 11.96}, {"d": -228, "p": 12.16}, {"d": -227, "p": 12.43}, {"d": -226, "p": 12.28}, {"d": -225, "p": 12.22}, {"d": -224, "p": 12.1}, {"d": -223, "p": 12.74}, {"d": -222, "p": 12.97}, {"d": -221, "p": 12.92}, {"d": -220, "p": 13.09}, {"d": -219, "p": 13.43}, {"d": -218, "p": 13.15}, {"d": -217, "p": 13.31}, {"d": -216, "p": 13.46}, {"d": -215, "p": 13.46}, {"d": -214, "p": 13.66}, {"d": -213, "p": 13.99}, {"d": -212, "p": 13.99}, {"d": -211, "p": 13.88}, {"d": -210, "p": 14.13}, {"d": -209, "p": 14.17}, {"d": -208, "p": 14.29}, {"d": -207, "p": 14.85}, {"d": -206, "p": 14.97}, {"d": -205, "p": 14.95}, {"d": -204, "p": 14.56}, {"d": -203, "p": 14.66}, {"d": -202, "p": 14.77}, {"d": -201, "p": 14.94}, {"d": -200, "p": 15.11}, {"d": -199, "p": 15.32}, {"d": -198, "p": 15.4}, {"d": -197, "p": 15.44}, {"d": -196, "p": 15.62}, {"d": -195, "p": 15.41}, {"d": -194, "p": 15.12}, {"d": -193, "p": 14.83}, {"d": -192, "p": 14.86}, {"d": -191, "p": 14.35}, {"d": -190, "p": 14.22}, {"d": -189, "p": 14.17}, {"d": -188, "p": 14.26}, {"d": -187, "p": 13.97}, {"d": -186, "p": 13.99}, {"d": -185, "p": 14.01}, {"d": -184, "p": 13.86}, {"d": -183, "p": 13.88}, {"d": -182, "p": 13.84}, {"d": -181, "p": 13.54}, {"d": -180, "p": 13.45}, {"d": -179, "p": 13.21}, {"d": -178, "p": 13.72}, {"d": -177, "p": 13.66}, {"d": -176, "p": 13.49}, {"d": -175, "p": 13.12}, {"d": -174, "p": 13.12}, {"d": -173, "p": 13.21}, {"d": -172, "p": 13.23}, {"d": -171, "p": 12.88}, {"d": -170, "p": 12.62}, {"d": -169, "p": 12.35}, {"d": -168, "p": 12.4}, {"d": -167, "p": 12.2}, {"d": -166, "p": 12.18}, {"d": -165, "p": 12.62}, {"d": -164, "p": 12.17}, {"d": -163, "p": 12.11}, {"d": -162, "p": 12.1}, {"d": -161, "p": 11.75}, {"d": -160, "p": 12.0}, {"d": -159, "p": 11.94}, {"d": -158, "p": 12.03}, {"d": -157, "p": 12.17}, {"d": -156, "p": 12.51}, {"d": -155, "p": 12.36}, {"d": -154, "p": 12.2}, {"d": -153, "p": 11.9}, {"d": -152, "p": 11.61}, {"d": -151, "p": 12.04}, {"d": -150, "p": 11.93}, {"d": -149, "p": 11.53}, {"d": -148, "p": 11.69}, {"d": -147, "p": 12.11}, {"d": -146, "p": 11.88}, {"d": -145, "p": 11.87}, {"d": -144, "p": 11.55}, {"d": -143, "p": 11.1}, {"d": -142, "p": 11.06}, {"d": -141, "p": 10.8}, {"d": -140, "p": 10.55}, {"d": -139, "p": 10.56}, {"d": -138, "p": 10.64}, {"d": -137, "p": 10.59}, {"d": -136, "p": 10.87}, {"d": -135, "p": 10.73}, {"d": -134, "p": 10.66}, {"d": -133, "p": 10.84}, {"d": -132, "p": 11.34}, {"d": -131, "p": 11.8}, {"d": -130, "p": 12.03}, {"d": -129, "p": 12.06}, {"d": -128, "p": 11.74}, {"d": -127, "p": 12.09}, {"d": -126, "p": 12.07}, {"d": -125, "p": 12.62}, {"d": -124, "p": 12.61}, {"d": -123, "p": 12.11}, {"d": -122, "p": 12.36}, {"d": -121, "p": 12.37}, {"d": -120, "p": 12.22}, {"d": -119, "p": 12.23}, {"d": -118, "p": 12.21}, {"d": -117, "p": 12.26}, {"d": -116, "p": 11.81}, {"d": -115, "p": 11.79}, {"d": -114, "p": 11.87}, {"d": -113, "p": 11.56}, {"d": -112, "p": 11.84}, {"d": -111, "p": 11.78}, {"d": -110, "p": 11.29}, {"d": -109, "p": 11.63}, {"d": -108, "p": 11.52}, {"d": -107, "p": 11.51}, {"d": -106, "p": 11.44}, {"d": -105, "p": 11.88}, {"d": -104, "p": 11.86}, {"d": -103, "p": 11.68}, {"d": -102, "p": 11.5}, {"d": -101, "p": 11.62}, {"d": -100, "p": 11.73}, {"d": -99, "p": 11.56}, {"d": -98, "p": 11.76}, {"d": -97, "p": 11.58}, {"d": -96, "p": 11.59}, {"d": -95, "p": 11.7}, {"d": -94, "p": 11.74}, {"d": -93, "p": 11.78}, {"d": -92, "p": 11.83}, {"d": -91, "p": 11.69}, {"d": -90, "p": 11.72}, {"d": -89, "p": 11.78}, {"d": -88, "p": 11.47}, {"d": -87, "p": 11.13}, {"d": -86, "p": 11.18}, {"d": -85, "p": 11.15}, {"d": -84, "p": 11.17}, {"d": -83, "p": 11.32}, {"d": -82, "p": 11.38}, {"d": -81, "p": 11.24}, {"d": -80, "p": 11.34}, {"d": -79, "p": 11.16}, {"d": -78, "p": 11.53}, {"d": -77, "p": 11.76}, {"d": -76, "p": 11.74}, {"d": -75, "p": 11.56}, {"d": -74, "p": 11.66}, {"d": -73, "p": 11.6}, {"d": -72, "p": 11.41}, {"d": -71, "p": 11.51}, {"d": -70, "p": 11.51}, {"d": -69, "p": 11.69}, {"d": -68, "p": 11.63}, {"d": -67, "p": 12.06}, {"d": -66, "p": 12.47}, {"d": -65, "p": 12.06}, {"d": -64, "p": 11.56}, {"d": -63, "p": 11.32}, {"d": -62, "p": 11.65}, {"d": -61, "p": 11.79}, {"d": -60, "p": 11.8}, {"d": -59, "p": 11.85}, {"d": -58, "p": 11.54}, {"d": -57, "p": 11.57}, {"d": -56, "p": 11.32}, {"d": -55, "p": 11.35}, {"d": -54, "p": 11.26}, {"d": -53, "p": 11.12}, {"d": -52, "p": 10.99}, {"d": -51, "p": 11.1}, {"d": -50, "p": 11.52}, {"d": -49, "p": 11.11}, {"d": -48, "p": 11.26}, {"d": -47, "p": 11.15}, {"d": -46, "p": 11.48}, {"d": -45, "p": 11.72}, {"d": -44, "p": 11.5}, {"d": -43, "p": 11.51}, {"d": -42, "p": 11.82}, {"d": -41, "p": 12.2}, {"d": -40, "p": 12.03}, {"d": -39, "p": 11.77}, {"d": -38, "p": 11.82}, {"d": -37, "p": 12.12}, {"d": -36, "p": 12.33}, {"d": -35, "p": 12.39}, {"d": -34, "p": 12.5}, {"d": -33, "p": 12.62}, {"d": -32, "p": 12.61}, {"d": -31, "p": 12.37}, {"d": -30, "p": 12.52}, {"d": -29, "p": 12.61}, {"d": -28, "p": 12.81}, {"d": -27, "p": 12.78}, {"d": -26, "p": 12.63}, {"d": -25, "p": 12.8}, {"d": -24, "p": 13.0}, {"d": -23, "p": 13.45}, {"d": -22, "p": 13.08}, {"d": -21, "p": 12.94}, {"d": -20, "p": 12.85}, {"d": -19, "p": 13.4}, {"d": -18, "p": 12.77}, {"d": -17, "p": 12.99}, {"d": -16, "p": 12.77}, {"d": -15, "p": 12.49}, {"d": -14, "p": 12.68}, {"d": -13, "p": 12.85}, {"d": -12, "p": 12.04}, {"d": -11, "p": 11.73}, {"d": -10, "p": 11.71}, {"d": -9, "p": 11.57}, {"d": -8, "p": 11.8}, {"d": -7, "p": 11.59}, {"d": -6, "p": 11.51}, {"d": -5, "p": 10.99}, {"d": -4, "p": 11.09}, {"d": -3, "p": 11.07}, {"d": -2, "p": 11.21}, {"d": -1, "p": 11.03}, {"d": 0, "p": 11.42}], "keyFinancials": {"marketCap": "$640M", "peRatio": null, "revenueGrowthYoY": -1.5, "grossMargin": 31.0, "fcfYield": 2.4, "dividendYield": 0.0}, "conclusionReason": "narrowing losses and a slowly stabilizing sales trend", "shortlist": {"status": "active", "rank": 3, "addedDate": "2026-08-01", "selectionReason": "Narrowing losses and a stabilizing sales trend support an early-stage turnaround case.", "replacementNote": null}}, {"id": "nvidia", "ticker": "NVDA", "name": "Nvidia Corporation", "archetype": "growth_leader", "archetypeLabel": "Growth Leader", "sector": "Semiconductors & AI Hardware", "oneLiner": "The dominant supplier of AI training and inference chips, still expanding its lead as data-center demand grows.", "keyFinancials": {"marketCap": "$3.1T", "peRatio": 42.5, "revenueGrowthYoY": 58.0, "grossMargin": 74.0, "fcfYield": 2.1, "dividendYield": 0.03}, "price": {"current": 223.96, "periodHigh": 235.74, "periodLow": 165.17, "percentChange": 23.1, "relativePerformance": 7.8}, "priceHistory": [{"d": -99, "p": 181.93}, {"d": -98, "p": 180.4}, {"d": -97, "p": 178.56}, {"d": -96, "p": 172.7}, {"d": -95, "p": 175.64}, {"d": -94, "p": 175.2}, {"d": -93, "p": 178.68}, {"d": -92, "p": 171.24}, {"d": -91, "p": 167.52}, {"d": -90, "p": 165.17}, {"d": -89, "p": 174.4}, {"d": -88, "p": 175.75}, {"d": -87, "p": 177.39}, {"d": -86, "p": 177.64}, {"d": -85, "p": 178.1}, {"d": -84, "p": 182.08}, {"d": -83, "p": 183.91}, {"d": -82, "p": 188.63}, {"d": -81, "p": 189.31}, {"d": -80, "p": 196.51}, {"d": -79, "p": 198.87}, {"d": -78, "p": 198.35}, {"d": -77, "p": 201.68}, {"d": -76, "p": 202.06}, {"d": -75, "p": 199.88}, {"d": -74, "p": 202.5}, {"d": -73, "p": 199.64}, {"d": -72, "p": 208.27}, {"d": -71, "p": 216.61}, {"d": -70, "p": 213.17}, {"d": -69, "p": 209.25}, {"d": -68, "p": 199.57}, {"d": -67, "p": 198.45}, {"d": -66, "p": 198.48}, {"d": -65, "p": 196.5}, {"d": -64, "p": 207.83}, {"d": -63, "p": 211.5}, {"d": -62, "p": 215.2}, {"d": -61, "p": 219.44}, {"d": -60, "p": 220.78}, {"d": -59, "p": 225.83}, {"d": -58, "p": 235.74}, {"d": -57, "p": 225.32}, {"d": -56, "p": 222.32}, {"d": -55, "p": 220.61}, {"d": -54, "p": 223.47}, {"d": -53, "p": 219.51}, {"d": -52, "p": 215.33}, {"d": -51, "p": 214.86}, {"d": -50, "p": 212.6}, {"d": -49, "p": 214.25}, {"d": -48, "p": 211.14}, {"d": -47, "p": 224.36}, {"d": -46, "p": 222.82}, {"d": -45, "p": 214.75}, {"d": -44, "p": 218.66}, {"d": -43, "p": 205.1}, {"d": -42, "p": 208.64}, {"d": -41, "p": 208.19}, {"d": -40, "p": 200.42}, {"d": -39, "p": 204.87}, {"d": -38, "p": 205.19}, {"d": -37, "p": 212.45}, {"d": -36, "p": 207.41}, {"d": -35, "p": 204.65}, {"d": -34, "p": 210.69}, {"d": -33, "p": 208.65}, {"d": -32, "p": 200.04}, {"d": -31, "p": 199.0}, {"d": -30, "p": 195.74}, {"d": -29, "p": 192.53}, {"d": -28, "p": 194.97}, {"d": -27, "p": 200.09}, {"d": -26, "p": 197.58}, {"d": -25, "p": 194.83}, {"d": -24, "p": 195.55}, {"d": -23, "p": 196.93}, {"d": -22, "p": 204.12}, {"d": -21, "p": 202.78}, {"d": -20, "p": 210.96}, {"d": -19, "p": 203.53}, {"d": -18, "p": 211.8}, {"d": -17, "p": 212.5}, {"d": -16, "p": 207.4}, {"d": -15, "p": 202.81}, {"d": -14, "p": 203.28}, {"d": -13, "p": 207.29}, {"d": -12, "p": 212.06}, {"d": -11, "p": 208.76}, {"d": -10, "p": 206.84}, {"d": -9, "p": 196.51}, {"d": -8, "p": 197.01}, {"d": -7, "p": 190.01}, {"d": -6, "p": 195.04}, {"d": -5, "p": 200.75}, {"d": -4, "p": 206.64}, {"d": -3, "p": 211.94}, {"d": -2, "p": 219.22}, {"d": -1, "p": 218.99}, {"d": 0, "p": 223.96}], "byTimeframe": {"1w": {"opportunityScore": 76, "risk": "Medium", "confidence": "Medium", "targetLabel": "1-2 Week Target", "scenarios": {"bear": {"price": 218.05, "note": "Data-center capex growth slows or a competitor closes the performance gap faster than expected."}, "base": {"price": 225.5, "note": "Data-center GPU demand keeps growing in line with recent trends, with margins holding near current levels."}, "bull": {"price": 230.47, "note": "AI infrastructure spending accelerates further and next-generation chips extend the company's lead."}}}, "1m": {"opportunityScore": 80, "risk": "Medium", "confidence": "Medium", "targetLabel": "1 Month Target", "scenarios": {"bear": {"price": 213.75, "note": "Data-center capex growth slows or a competitor closes the performance gap faster than expected."}, "base": {"price": 227.02, "note": "Data-center GPU demand keeps growing in line with recent trends, with margins holding near current levels."}, "bull": {"price": 235.19, "note": "AI infrastructure spending accelerates further and next-generation chips extend the company's lead."}}}, "3m": {"opportunityScore": 85, "risk": "Medium", "confidence": "Medium", "targetLabel": "3 Month Target", "scenarios": {"bear": {"price": 207.3, "note": "Data-center capex growth slows or a competitor closes the performance gap faster than expected."}, "base": {"price": 229.79, "note": "Data-center GPU demand keeps growing in line with recent trends, with margins holding near current levels."}, "bull": {"price": 242.29, "note": "AI infrastructure spending accelerates further and next-generation chips extend the company's lead."}}}, "6m": {"opportunityScore": 88, "risk": "Low", "confidence": "High", "targetLabel": "6-9 Month Target", "scenarios": {"bear": {"price": 210.52, "note": "Data-center capex growth slows or a competitor closes the performance gap faster than expected."}, "base": {"price": 234.17, "note": "Data-center GPU demand keeps growing in line with recent trends, with margins holding near current levels."}, "bull": {"price": 238.73, "note": "AI infrastructure spending accelerates further and next-generation chips extend the company's lead."}}}, "1y": {"opportunityScore": 90, "risk": "Low", "confidence": "High", "targetLabel": "12 Month Target", "scenarios": {"bear": {"price": 203.13, "note": "Data-center capex growth slows or a competitor closes the performance gap faster than expected."}, "base": {"price": 240.62, "note": "Data-center GPU demand keeps growing in line with recent trends, with margins holding near current levels."}, "bull": {"price": 246.87, "note": "AI infrastructure spending accelerates further and next-generation chips extend the company's lead."}}}}, "evidence": {"developments": [{"title": "Cathie Wood's Ark piled into Nvidia after Meta's earnings", "detail": "Ark Invest bought heavily into Nvidia and TSMC after Meta's results pointed to accelerating AI infrastructure spending.", "date": "2026-08-09"}, {"title": "Nvidia-backed Lumentum rallies ahead of earnings", "detail": "Analysts are bullish on Lumentum's growth outlook, though the stock remains sensitive to any miss on expectations.", "date": "2026-08-09"}, {"title": "Marvell's AI interconnect growth compared to Nvidia, Broadcom", "detail": "Coverage weighing whether Marvell's data-center growth can justify its valuation against larger AI peers.", "date": "2026-08-09"}], "financialTrends": [{"metric": "Revenue Growth (YoY)", "trend": "up", "detail": "Data-center revenue continues to grow rapidly as AI infrastructure spending remains a top corporate priority.", "stat": "58%"}, {"metric": "Gross Margin", "trend": "up", "detail": "Margins remain among the highest in the semiconductor industry, supported by strong pricing power.", "stat": "74%"}, {"metric": "Free Cash Flow", "trend": "up", "detail": "Cash generation remains very strong, funding continued R&D and buybacks.", "stat": "+45%"}, {"metric": "R&D Spend (% of Revenue)", "trend": "up", "detail": "Investment in next-generation architectures continues to rise to defend its technology lead.", "stat": "18%"}, {"metric": "Inventory Levels", "trend": "up", "detail": "Inventory has grown to support upcoming product launches, a normal pattern ahead of a major platform transition.", "stat": "Rising"}], "catalysts": ["Next-generation chip platform ramping through the second half of the year", "Continued multi-year cloud capacity commitments from major customers", "Expanding use cases beyond training into AI inference at scale"], "risks": ["Customer concentration among a small number of very large cloud providers", "Rich valuation leaves little room for any growth disappointment", "Increasing in-house chip efforts from major customers over the long term"], "invalidation": ["Data-center revenue growth decelerates sharply for two consecutive quarters", "A major cloud customer materially cuts its capital spending plans", "A competitor closes the performance gap faster than expected in a key product cycle"]}, "conclusionReason": "continued AI infrastructure demand and best-in-class margins", "shortlist": {"status": "active", "rank": 1, "addedDate": "2026-08-06", "selectionReason": "Continued AI infrastructure demand and best-in-class margins support a strong risk-reward profile.", "replacementNote": null}}, {"id": "palantir", "ticker": "PLTR", "name": "Palantir Technologies", "archetype": "emerging_opportunity", "archetypeLabel": "Emerging Opportunity", "sector": "Enterprise Software & AI Analytics", "oneLiner": "An enterprise AI software platform moving from government roots into broader commercial adoption.", "keyFinancials": {"marketCap": "$185B", "peRatio": 185.0, "revenueGrowthYoY": 35.0, "grossMargin": 80.0, "fcfYield": 1.4, "dividendYield": 0.0}, "price": {"current": 172.01, "periodHigh": 172.01, "periodLow": 107.27, "percentChange": 10.9, "relativePerformance": -4.4}, "priceHistory": [{"d": -99, "p": 155.08}, {"d": -98, "p": 152.77}, {"d": -97, "p": 155.68}, {"d": -96, "p": 150.68}, {"d": -95, "p": 160.84}, {"d": -94, "p": 154.78}, {"d": -93, "p": 154.96}, {"d": -92, "p": 147.56}, {"d": -91, "p": 143.06}, {"d": -90, "p": 137.55}, {"d": -89, "p": 146.28}, {"d": -88, "p": 146.49}, {"d": -87, "p": 148.46}, {"d": -86, "p": 147.93}, {"d": -85, "p": 150.07}, {"d": -84, "p": 140.76}, {"d": -83, "p": 130.49}, {"d": -82, "p": 128.06}, {"d": -81, "p": 132.37}, {"d": -80, "p": 135.7}, {"d": -79, "p": 142.15}, {"d": -78, "p": 142.76}, {"d": -77, "p": 146.39}, {"d": -76, "p": 145.89}, {"d": -75, "p": 145.97}, {"d": -74, "p": 152.62}, {"d": -73, "p": 141.57}, {"d": -72, "p": 143.09}, {"d": -71, "p": 143.1}, {"d": -70, "p": 141.18}, {"d": -69, "p": 137.97}, {"d": -68, "p": 139.11}, {"d": -67, "p": 144.07}, {"d": -66, "p": 146.03}, {"d": -65, "p": 135.91}, {"d": -64, "p": 133.79}, {"d": -63, "p": 137.05}, {"d": -62, "p": 137.8}, {"d": -61, "p": 136.89}, {"d": -60, "p": 136.0}, {"d": -59, "p": 130.05}, {"d": -58, "p": 133.73}, {"d": -57, "p": 133.99}, {"d": -56, "p": 135.14}, {"d": -55, "p": 135.26}, {"d": -54, "p": 137.15}, {"d": -53, "p": 137.41}, {"d": -52, "p": 136.88}, {"d": -51, "p": 136.6}, {"d": -50, "p": 132.51}, {"d": -49, "p": 143.34}, {"d": -48, "p": 156.54}, {"d": -47, "p": 160.65}, {"d": -46, "p": 152.17}, {"d": -45, "p": 142.2}, {"d": -44, "p": 141.7}, {"d": -43, "p": 135.53}, {"d": -42, "p": 136.47}, {"d": -41, "p": 132.07}, {"d": -40, "p": 130.21}, {"d": -39, "p": 131.08}, {"d": -38, "p": 127.99}, {"d": -37, "p": 134.71}, {"d": -36, "p": 133.25}, {"d": -35, "p": 130.63}, {"d": -34, "p": 128.47}, {"d": -33, "p": 119.5}, {"d": -32, "p": 116.7}, {"d": -31, "p": 113.5}, {"d": -30, "p": 107.27}, {"d": -29, "p": 112.93}, {"d": -28, "p": 115.7}, {"d": -27, "p": 116.67}, {"d": -26, "p": 125.73}, {"d": -25, "p": 129.3}, {"d": -24, "p": 132.54}, {"d": -23, "p": 134.37}, {"d": -22, "p": 132.22}, {"d": -21, "p": 129.04}, {"d": -20, "p": 126.79}, {"d": -19, "p": 130.04}, {"d": -18, "p": 133.72}, {"d": -17, "p": 133.76}, {"d": -16, "p": 134.44}, {"d": -15, "p": 132.38}, {"d": -14, "p": 134.85}, {"d": -13, "p": 132.66}, {"d": -12, "p": 124.57}, {"d": -11, "p": 123.37}, {"d": -10, "p": 122.92}, {"d": -9, "p": 131.53}, {"d": -8, "p": 123.53}, {"d": -7, "p": 123.0}, {"d": -6, "p": 122.26}, {"d": -5, "p": 123.06}, {"d": -4, "p": 125.65}, {"d": -3, "p": 162.66}, {"d": -2, "p": 158.43}, {"d": -1, "p": 155.92}, {"d": 0, "p": 172.01}], "byTimeframe": {"1w": {"opportunityScore": 58, "risk": "High", "confidence": "Low", "targetLabel": "1-2 Week Target", "scenarios": {"bear": {"price": 163.69, "note": "Government or large enterprise contract renewals disappoint, or growth decelerates faster than the market expects."}, "base": {"price": 172.36, "note": "Commercial and government AI deployments continue converting at a similar pace to recent quarters."}, "bull": {"price": 181.16, "note": "Commercial adoption inflects sharply as more enterprises move AI pilots into full production contracts."}}}, "1m": {"opportunityScore": 63, "risk": "High", "confidence": "Low", "targetLabel": "1 Month Target", "scenarios": {"bear": {"price": 157.63, "note": "Government or large enterprise contract renewals disappoint, or growth decelerates faster than the market expects."}, "base": {"price": 173.04, "note": "Commercial and government AI deployments continue converting at a similar pace to recent quarters."}, "bull": {"price": 187.83, "note": "Commercial adoption inflects sharply as more enterprises move AI pilots into full production contracts."}}}, "3m": {"opportunityScore": 68, "risk": "High", "confidence": "Medium", "targetLabel": "3 Month Target", "scenarios": {"bear": {"price": 148.55, "note": "Government or large enterprise contract renewals disappoint, or growth decelerates faster than the market expects."}, "base": {"price": 174.32, "note": "Commercial and government AI deployments continue converting at a similar pace to recent quarters."}, "bull": {"price": 197.81, "note": "Commercial adoption inflects sharply as more enterprises move AI pilots into full production contracts."}}}, "6m": {"opportunityScore": 73, "risk": "High", "confidence": "Medium", "targetLabel": "6-9 Month Target", "scenarios": {"bear": {"price": 134.16, "note": "Government or large enterprise contract renewals disappoint, or growth decelerates faster than the market expects."}, "base": {"price": 176.76, "note": "Commercial and government AI deployments continue converting at a similar pace to recent quarters."}, "bull": {"price": 213.63, "note": "Commercial adoption inflects sharply as more enterprises move AI pilots into full production contracts."}}}, "1y": {"opportunityScore": 78, "risk": "Medium", "confidence": "Medium", "targetLabel": "12 Month Target", "scenarios": {"bear": {"price": 140.02, "note": "Government or large enterprise contract renewals disappoint, or growth decelerates faster than the market expects."}, "base": {"price": 180.96, "note": "Commercial and government AI deployments continue converting at a similar pace to recent quarters."}, "bull": {"price": 207.19, "note": "Commercial adoption inflects sharply as more enterprises move AI pilots into full production contracts."}}}}, "evidence": {"developments": [{"title": "Palantir's enterprise AI approach compared to Salesforce", "detail": "Palantir posted stronger revenue growth, but its high valuation is a bigger risk than Salesforce's more moderate profile, per the comparison.", "date": "2026-08-09"}, {"title": "Insider sells shares under a pre-arranged trading plan", "detail": "A Palantir director sold roughly 3,000 shares at $165 as part of a scheduled 10b5-1 plan set up in February.", "date": "2026-08-08"}, {"title": "Palantir highlighted among this week's market winners", "detail": "Strong earnings and raised guidance put Palantir among the market's standout performers for the week.", "date": "2026-08-08"}], "financialTrends": [{"metric": "Revenue Growth (YoY)", "trend": "up", "detail": "Commercial revenue growth has accelerated as more enterprise pilots convert to full deployments.", "stat": "35%"}, {"metric": "Gross Margin", "trend": "up", "detail": "Software-like margins continue to expand as the platform scales.", "stat": "80%"}, {"metric": "Free Cash Flow", "trend": "up", "detail": "Cash generation has turned solidly positive and continues to grow.", "stat": "+62%"}, {"metric": "Customer Count", "trend": "up", "detail": "The customer base keeps growing, particularly among large commercial enterprises.", "stat": "+38%"}, {"metric": "Operating Expenses (% of Revenue)", "trend": "down", "detail": "Operating leverage is improving as revenue grows faster than headcount and spending.", "stat": "-6 pts"}], "catalysts": ["Continued conversion of commercial pilots into multi-year contracts", "Expansion into new industry verticals beyond government and defense", "Further margin expansion as the platform scales"], "risks": ["Valuation already prices in a great deal of future growth", "Revenue still has meaningful concentration in government contracts", "Competition from both large cloud providers and specialized AI startups"], "invalidation": ["Commercial revenue growth decelerates well below recent trends", "A major government contract is not renewed", "Gross margin contracts instead of continuing to expand"]}, "conclusionReason": "accelerating commercial revenue growth", "shortlist": {"status": "active", "rank": 2, "addedDate": "2026-08-01", "selectionReason": "Accelerating commercial revenue growth reflects strengthening business momentum.", "replacementNote": null}}, {"id": "disney", "ticker": "DIS", "name": "The Walt Disney Company", "archetype": "turnaround", "archetypeLabel": "Turnaround Candidate", "sector": "Media, Entertainment & Theme Parks", "oneLiner": "A media and entertainment giant working through a multi-year pivot to profitable streaming alongside resilient theme parks.", "keyFinancials": {"marketCap": "$210B", "peRatio": 22.8, "revenueGrowthYoY": 6.0, "grossMargin": 34.0, "fcfYield": 4.2, "dividendYield": 1.1}, "price": {"current": 104.91, "periodHigh": 108.66, "periodLow": 92.42, "percentChange": 4.6, "relativePerformance": -10.7}, "priceHistory": [{"d": -99, "p": 100.3}, {"d": -98, "p": 99.42}, {"d": -97, "p": 99.2}, {"d": -96, "p": 99.51}, {"d": -95, "p": 97.95}, {"d": -94, "p": 96.39}, {"d": -93, "p": 95.95}, {"d": -92, "p": 94.75}, {"d": -91, "p": 92.42}, {"d": -90, "p": 94.32}, {"d": -89, "p": 96.38}, {"d": -88, "p": 96.56}, {"d": -87, "p": 96.61}, {"d": -86, "p": 96.28}, {"d": -85, "p": 95.78}, {"d": -84, "p": 99.18}, {"d": -83, "p": 99.79}, {"d": -82, "p": 99.17}, {"d": -81, "p": 101.18}, {"d": -80, "p": 102.59}, {"d": -79, "p": 103.04}, {"d": -78, "p": 103.9}, {"d": -77, "p": 106.29}, {"d": -76, "p": 106.3}, {"d": -75, "p": 104.29}, {"d": -74, "p": 104.82}, {"d": -73, "p": 103.65}, {"d": -72, "p": 102.6}, {"d": -71, "p": 102.35}, {"d": -70, "p": 101.47}, {"d": -69, "p": 101.3}, {"d": -68, "p": 103.75}, {"d": -67, "p": 103.08}, {"d": -66, "p": 101.31}, {"d": -65, "p": 100.48}, {"d": -64, "p": 108.06}, {"d": -63, "p": 108.66}, {"d": -62, "p": 108.02}, {"d": -61, "p": 104.72}, {"d": -60, "p": 106.16}, {"d": -59, "p": 104.9}, {"d": -58, "p": 105.42}, {"d": -57, "p": 102.72}, {"d": -56, "p": 103.91}, {"d": -55, "p": 102.29}, {"d": -54, "p": 104.08}, {"d": -53, "p": 103.58}, {"d": -52, "p": 103.0}, {"d": -51, "p": 103.28}, {"d": -50, "p": 104.18}, {"d": -49, "p": 103.73}, {"d": -48, "p": 101.83}, {"d": -47, "p": 102.85}, {"d": -46, "p": 101.41}, {"d": -45, "p": 99.39}, {"d": -44, "p": 99.34}, {"d": -43, "p": 99.71}, {"d": -42, "p": 98.87}, {"d": -41, "p": 99.33}, {"d": -40, "p": 98.61}, {"d": -39, "p": 100.34}, {"d": -38, "p": 100.04}, {"d": -37, "p": 101.69}, {"d": -36, "p": 101.28}, {"d": -35, "p": 100.86}, {"d": -34, "p": 103.89}, {"d": -33, "p": 102.45}, {"d": -32, "p": 103.53}, {"d": -31, "p": 101.12}, {"d": -30, "p": 98.05}, {"d": -29, "p": 98.79}, {"d": -28, "p": 98.63}, {"d": -27, "p": 96.25}, {"d": -26, "p": 95.71}, {"d": -25, "p": 99.5}, {"d": -24, "p": 97.41}, {"d": -23, "p": 97.48}, {"d": -22, "p": 96.7}, {"d": -21, "p": 96.17}, {"d": -20, "p": 95.62}, {"d": -19, "p": 96.0}, {"d": -18, "p": 95.87}, {"d": -17, "p": 97.15}, {"d": -16, "p": 99.71}, {"d": -15, "p": 97.67}, {"d": -14, "p": 96.41}, {"d": -13, "p": 96.14}, {"d": -12, "p": 95.87}, {"d": -11, "p": 92.83}, {"d": -10, "p": 94.85}, {"d": -9, "p": 96.65}, {"d": -8, "p": 98.89}, {"d": -7, "p": 98.48}, {"d": -6, "p": 96.16}, {"d": -5, "p": 96.19}, {"d": -4, "p": 98.14}, {"d": -3, "p": 98.18}, {"d": -2, "p": 101.76}, {"d": -1, "p": 104.68}, {"d": 0, "p": 104.91}], "byTimeframe": {"1w": {"opportunityScore": 48, "risk": "High", "confidence": "Low", "targetLabel": "1-2 Week Target", "scenarios": {"bear": {"price": 99.83, "note": "Streaming subscriber growth stalls or theme park attendance softens amid a weaker consumer."}, "base": {"price": 104.86, "note": "Streaming profitability keeps improving gradually while parks and experiences remain resilient."}, "bull": {"price": 110.49, "note": "Streaming margins expand faster than guided and a strong content slate reaccelerates subscriber growth."}}}, "1m": {"opportunityScore": 51, "risk": "High", "confidence": "Low", "targetLabel": "1 Month Target", "scenarios": {"bear": {"price": 96.14, "note": "Streaming subscriber growth stalls or theme park attendance softens amid a weaker consumer."}, "base": {"price": 104.96, "note": "Streaming profitability keeps improving gradually while parks and experiences remain resilient."}, "bull": {"price": 114.55, "note": "Streaming margins expand faster than guided and a strong content slate reaccelerates subscriber growth."}}}, "3m": {"opportunityScore": 56, "risk": "Medium", "confidence": "Medium", "targetLabel": "3 Month Target", "scenarios": {"bear": {"price": 97.11, "note": "Streaming subscriber growth stalls or theme park attendance softens amid a weaker consumer."}, "base": {"price": 105.37, "note": "Streaming profitability keeps improving gradually while parks and experiences remain resilient."}, "bull": {"price": 113.5, "note": "Streaming margins expand faster than guided and a strong content slate reaccelerates subscriber growth."}}}, "6m": {"opportunityScore": 62, "risk": "Medium", "confidence": "Medium", "targetLabel": "6-9 Month Target", "scenarios": {"bear": {"price": 92.32, "note": "Streaming subscriber growth stalls or theme park attendance softens amid a weaker consumer."}, "base": {"price": 106.42, "note": "Streaming profitability keeps improving gradually while parks and experiences remain resilient."}, "bull": {"price": 118.76, "note": "Streaming margins expand faster than guided and a strong content slate reaccelerates subscriber growth."}}}, "1y": {"opportunityScore": 67, "risk": "Medium", "confidence": "Medium", "targetLabel": "12 Month Target", "scenarios": {"bear": {"price": 85.39, "note": "Streaming subscriber growth stalls or theme park attendance softens amid a weaker consumer."}, "base": {"price": 108.22, "note": "Streaming profitability keeps improving gradually while parks and experiences remain resilient."}, "bull": {"price": 126.37, "note": "Streaming margins expand faster than guided and a strong content slate reaccelerates subscriber growth."}}}}, "evidence": {"developments": [{"title": "Disney and TikTok announce content-sharing partnership", "detail": "Fan-made Disney content from TikTok will be integrated into Disney+, spanning Pixar, Marvel, and Star Wars.", "date": "2026-08-06"}, {"title": "Disney beta-tests AI-powered search on ESPN and Disney+", "detail": "New natural-language search and content-discovery tools aim to reduce friction for subscribers.", "date": "2026-08-06"}, {"title": "Wells Fargo raises Disney price target to $132", "detail": "The bank kept its overweight rating after Disney beat EPS estimates, even as revenue slightly missed.", "date": "2026-08-06"}], "financialTrends": [{"metric": "Streaming Operating Margin", "trend": "up", "detail": "Direct-to-consumer profitability keeps improving as the business moves past its heaviest investment phase.", "stat": "4%"}, {"metric": "Parks Revenue", "trend": "up", "detail": "Theme park attendance and per-guest spending remain resilient.", "stat": "+6%"}, {"metric": "Linear TV Revenue", "trend": "down", "detail": "Traditional television networks continue to decline as viewers shift to streaming, a well-understood industry trend.", "stat": "-8%"}, {"metric": "Free Cash Flow", "trend": "up", "detail": "Cash flow has improved as streaming losses narrow and cost cuts take hold.", "stat": "+12%"}, {"metric": "Content Spending", "trend": "flat", "detail": "Content investment is being held roughly steady while the company prioritizes returns on existing franchises.", "stat": "Flat"}], "catalysts": ["Streaming profitability continuing to improve toward company targets", "Strong theme park bookings heading into the next fiscal year", "Potential further cost synergies across media divisions"], "risks": ["Linear TV decline could outpace streaming and parks growth", "Execution risk in balancing content investment with profitability targets", "Consumer spending pullback could hit discretionary parks visits"], "invalidation": ["Streaming losses widen again instead of continuing to narrow", "Theme park attendance or spending softens meaningfully", "Linear TV decline accelerates faster than streaming and parks growth can offset"]}, "conclusionReason": "improving streaming profitability and resilient parks demand", "shortlist": {"status": "removed", "removedDate": "2026-08-06", "removalReason": "Opportunity Score weakened as streaming-profitability momentum slowed and consumer-spending risk increased.", "replacedBy": "nvidia", "scoreAtRemoval": 56, "riskAtRemoval": "Medium", "thesisStatusAtRemoval": "Weakened"}}, {"id": "jpmorgan", "ticker": "JPM", "name": "JPMorgan Chase & Co.", "archetype": "value_champion", "archetypeLabel": "Value Champion", "sector": "Diversified Banking & Financial Services", "oneLiner": "One of the largest and most diversified banks, valued for balance-sheet strength and consistent through-cycle earnings.", "keyFinancials": {"marketCap": "$620B", "peRatio": 13.2, "revenueGrowthYoY": 8.0, "grossMargin": 58.0, "fcfYield": 6.5, "dividendYield": 2.4}, "price": {"current": 357.52, "periodHigh": 359.24, "periodLow": 282.84, "percentChange": 24.6, "relativePerformance": 9.3}, "priceHistory": [{"d": -99, "p": 286.89}, {"d": -98, "p": 287.74}, {"d": -97, "p": 287.97}, {"d": -96, "p": 286.56}, {"d": -95, "p": 289.91}, {"d": -94, "p": 292.4}, {"d": -93, "p": 295.42}, {"d": -92, "p": 291.66}, {"d": -91, "p": 282.84}, {"d": -90, "p": 283.77}, {"d": -89, "p": 294.16}, {"d": -88, "p": 295.38}, {"d": -87, "p": 294.6}, {"d": -86, "p": 295.45}, {"d": -85, "p": 297.4}, {"d": -84, "p": 307.97}, {"d": -83, "p": 310.33}, {"d": -82, "p": 309.87}, {"d": -81, "p": 313.68}, {"d": -80, "p": 311.12}, {"d": -79, "p": 305.93}, {"d": -78, "p": 309.95}, {"d": -77, "p": 310.29}, {"d": -76, "p": 316.99}, {"d": -75, "p": 313.0}, {"d": -74, "p": 313.02}, {"d": -73, "p": 311.69}, {"d": -72, "p": 308.28}, {"d": -71, "p": 311.63}, {"d": -70, "p": 311.45}, {"d": -69, "p": 309.25}, {"d": -68, "p": 313.23}, {"d": -67, "p": 312.47}, {"d": -66, "p": 307.65}, {"d": -65, "p": 309.4}, {"d": -64, "p": 314.9}, {"d": -63, "p": 306.27}, {"d": -62, "p": 302.1}, {"d": -61, "p": 300.0}, {"d": -60, "p": 304.88}, {"d": -59, "p": 300.25}, {"d": -58, "p": 299.91}, {"d": -57, "p": 297.81}, {"d": -56, "p": 300.73}, {"d": -55, "p": 295.7}, {"d": -54, "p": 301.98}, {"d": -53, "p": 303.0}, {"d": -52, "p": 306.38}, {"d": -51, "p": 306.74}, {"d": -50, "p": 299.28}, {"d": -49, "p": 296.73}, {"d": -48, "p": 299.31}, {"d": -47, "p": 296.58}, {"d": -46, "p": 300.96}, {"d": -45, "p": 300.85}, {"d": -44, "p": 310.89}, {"d": -43, "p": 312.37}, {"d": -42, "p": 311.11}, {"d": -41, "p": 312.7}, {"d": -40, "p": 309.14}, {"d": -39, "p": 313.49}, {"d": -38, "p": 320.72}, {"d": -37, "p": 319.4}, {"d": -36, "p": 331.14}, {"d": -35, "p": 333.46}, {"d": -34, "p": 325.22}, {"d": -33, "p": 331.48}, {"d": -32, "p": 334.14}, {"d": -31, "p": 333.45}, {"d": -30, "p": 335.12}, {"d": -29, "p": 329.05}, {"d": -28, "p": 329.39}, {"d": -27, "p": 327.33}, {"d": -26, "p": 334.07}, {"d": -25, "p": 334.47}, {"d": -24, "p": 337.72}, {"d": -23, "p": 339.22}, {"d": -22, "p": 330.62}, {"d": -21, "p": 335.47}, {"d": -20, "p": 336.47}, {"d": -19, "p": 334.53}, {"d": -18, "p": 342.89}, {"d": -17, "p": 346.91}, {"d": -16, "p": 343.15}, {"d": -15, "p": 341.1}, {"d": -14, "p": 338.87}, {"d": -13, "p": 345.23}, {"d": -12, "p": 348.21}, {"d": -11, "p": 349.9}, {"d": -10, "p": 353.21}, {"d": -9, "p": 356.2}, {"d": -8, "p": 357.31}, {"d": -7, "p": 344.71}, {"d": -6, "p": 350.85}, {"d": -5, "p": 351.79}, {"d": -4, "p": 352.64}, {"d": -3, "p": 357.52}, {"d": -2, "p": 359.24}, {"d": -1, "p": 356.3}, {"d": 0, "p": 357.52}], "byTimeframe": {"1w": {"opportunityScore": 70, "risk": "Low", "confidence": "High", "targetLabel": "1-2 Week Target", "scenarios": {"bear": {"price": 352.8, "note": "A sharper-than-expected credit cycle or economic slowdown pressures loan losses and trading revenue."}, "base": {"price": 359.41, "note": "Net interest income and fee businesses grow steadily in line with the broader economy."}, "bull": {"price": 362.72, "note": "A resilient economy plus market-share gains in trading and wealth management push earnings above plan."}}}, "1m": {"opportunityScore": 71, "risk": "Low", "confidence": "High", "targetLabel": "1 Month Target", "scenarios": {"bear": {"price": 349.37, "note": "A sharper-than-expected credit cycle or economic slowdown pressures loan losses and trading revenue."}, "base": {"price": 360.94, "note": "Net interest income and fee businesses grow steadily in line with the broader economy."}, "bull": {"price": 366.49, "note": "A resilient economy plus market-share gains in trading and wealth management push earnings above plan."}}}, "3m": {"opportunityScore": 73, "risk": "Low", "confidence": "High", "targetLabel": "3 Month Target", "scenarios": {"bear": {"price": 344.21, "note": "A sharper-than-expected credit cycle or economic slowdown pressures loan losses and trading revenue."}, "base": {"price": 363.63, "note": "Net interest income and fee businesses grow steadily in line with the broader economy."}, "bull": {"price": 372.15, "note": "A resilient economy plus market-share gains in trading and wealth management push earnings above plan."}}}, "6m": {"opportunityScore": 75, "risk": "Low", "confidence": "High", "targetLabel": "6-9 Month Target", "scenarios": {"bear": {"price": 336.06, "note": "A sharper-than-expected credit cycle or economic slowdown pressures loan losses and trading revenue."}, "base": {"price": 368.25, "note": "Net interest income and fee businesses grow steadily in line with the broader economy."}, "bull": {"price": 381.12, "note": "A resilient economy plus market-share gains in trading and wealth management push earnings above plan."}}}, "1y": {"opportunityScore": 77, "risk": "Low", "confidence": "High", "targetLabel": "12 Month Target", "scenarios": {"bear": {"price": 324.27, "note": "A sharper-than-expected credit cycle or economic slowdown pressures loan losses and trading revenue."}, "base": {"price": 375.47, "note": "Net interest income and fee businesses grow steadily in line with the broader economy."}, "bull": {"price": 394.09, "note": "A resilient economy plus market-share gains in trading and wealth management push earnings above plan."}}}}, "evidence": {"developments": [{"title": "JPMorgan trades near 52-week high amid steady institutional buying", "detail": "Shares opened near $357 with hedge funds and institutions holding roughly 71.5% of the stock.", "date": "2026-08-09"}, {"title": "Analysts hold a \"Moderate Buy\" consensus on JPMorgan", "detail": "The average price target sits at $359.33, just above current levels, alongside a steady $1.50 quarterly dividend.", "date": "2026-08-09"}, {"title": "Mixed institutional activity in JPMorgan stock this quarter", "detail": "Several advisory firms adjusted their positions, ranging from modest trims to double-digit increases in their JPMorgan holdings.", "date": "2026-08-09"}], "financialTrends": [{"metric": "Net Interest Income", "trend": "flat", "detail": "Net interest income remains resilient as deposit and loan pricing adjust to the rate environment.", "stat": "Stable"}, {"metric": "Trading & Investment Banking Fees", "trend": "up", "detail": "Market share gains continue in trading and advisory fee pools.", "stat": "+14%"}, {"metric": "Credit Losses", "trend": "flat", "detail": "Charge-offs remain within normal historical ranges, reflecting a healthy loan book.", "stat": "Stable"}, {"metric": "Return on Tangible Equity", "trend": "up", "detail": "Profitability metrics remain among the strongest in the industry.", "stat": "21%"}, {"metric": "Capital Ratios", "trend": "flat", "detail": "Capital levels remain well above regulatory minimums, supporting continued buybacks and dividends.", "stat": "13.5%"}], "catalysts": ["Continued market share gains in trading and investment banking", "Resilient net interest income even if rates move lower", "Ongoing capital return through buybacks and dividend growth"], "risks": ["A sharper economic slowdown could pressure credit losses", "Net interest income is sensitive to the path of interest rates", "Increased regulatory capital requirements could limit buyback capacity"], "invalidation": ["Credit losses rise well above historical norms", "Net interest income declines sharply for multiple quarters", "A material regulatory or capital shortfall emerges"]}, "conclusionReason": "consistently strong, best-in-class profitability", "shortlist": {"status": "under_review", "rank": null, "addedDate": null, "selectionReason": null, "replacementNote": null}}, {"id": "elililly", "ticker": "LLY", "name": "Eli Lilly and Company", "archetype": "value_champion", "archetypeLabel": "Value Champion", "sector": "Pharmaceuticals & Biotechnology", "oneLiner": "A pharmaceutical leader with blockbuster metabolic and diabetes drugs still in the early stages of their growth curve.", "keyFinancials": {"marketCap": "$780B", "peRatio": 58.0, "revenueGrowthYoY": 32.0, "grossMargin": 80.0, "fcfYield": 1.8, "dividendYield": 0.7}, "price": {"current": 1185.71, "periodHigh": 1235.56, "periodLow": 851.21, "percentChange": 27.4, "relativePerformance": 12.2}, "priceHistory": [{"d": -99, "p": 930.35}, {"d": -98, "p": 918.05}, {"d": -97, "p": 917.5}, {"d": -96, "p": 906.7}, {"d": -95, "p": 910.55}, {"d": -94, "p": 903.02}, {"d": -93, "p": 916.31}, {"d": -92, "p": 897.0}, {"d": -91, "p": 878.24}, {"d": -90, "p": 886.63}, {"d": -89, "p": 919.77}, {"d": -88, "p": 954.52}, {"d": -87, "p": 935.58}, {"d": -86, "p": 927.06}, {"d": -85, "p": 931.09}, {"d": -84, "p": 953.3}, {"d": -83, "p": 955.19}, {"d": -82, "p": 939.47}, {"d": -81, "p": 929.55}, {"d": -80, "p": 922.5}, {"d": -79, "p": 905.03}, {"d": -78, "p": 903.99}, {"d": -77, "p": 927.03}, {"d": -76, "p": 919.9}, {"d": -75, "p": 903.02}, {"d": -74, "p": 921.48}, {"d": -73, "p": 917.65}, {"d": -72, "p": 883.96}, {"d": -71, "p": 868.27}, {"d": -70, "p": 874.0}, {"d": -69, "p": 851.21}, {"d": -68, "p": 934.6}, {"d": -67, "p": 963.33}, {"d": -66, "p": 967.93}, {"d": -65, "p": 988.87}, {"d": -64, "p": 987.05}, {"d": -63, "p": 974.96}, {"d": -62, "p": 948.45}, {"d": -61, "p": 966.99}, {"d": -60, "p": 989.87}, {"d": -59, "p": 1015.75}, {"d": -58, "p": 1006.7}, {"d": -57, "p": 1004.92}, {"d": -56, "p": 988.09}, {"d": -55, "p": 1021.41}, {"d": -54, "p": 1018.87}, {"d": -53, "p": 1041.65}, {"d": -52, "p": 1065.0}, {"d": -51, "p": 1064.74}, {"d": -50, "p": 1082.92}, {"d": -49, "p": 1126.8}, {"d": -48, "p": 1105.0}, {"d": -47, "p": 1082.2}, {"d": -46, "p": 1064.15}, {"d": -45, "p": 1078.78}, {"d": -44, "p": 1125.27}, {"d": -43, "p": 1131.42}, {"d": -42, "p": 1149.15}, {"d": -41, "p": 1144.68}, {"d": -40, "p": 1136.37}, {"d": -39, "p": 1160.95}, {"d": -38, "p": 1133.0}, {"d": -37, "p": 1129.35}, {"d": -36, "p": 1122.5}, {"d": -35, "p": 1112.0}, {"d": -34, "p": 1098.57}, {"d": -33, "p": 1102.08}, {"d": -32, "p": 1107.08}, {"d": -31, "p": 1117.26}, {"d": -30, "p": 1127.69}, {"d": -29, "p": 1208.12}, {"d": -28, "p": 1229.93}, {"d": -27, "p": 1199.43}, {"d": -26, "p": 1191.74}, {"d": -25, "p": 1213.91}, {"d": -24, "p": 1200.06}, {"d": -23, "p": 1235.56}, {"d": -22, "p": 1215.83}, {"d": -21, "p": 1216.95}, {"d": -20, "p": 1188.58}, {"d": -19, "p": 1181.87}, {"d": -18, "p": 1152.54}, {"d": -17, "p": 1156.63}, {"d": -16, "p": 1169.17}, {"d": -15, "p": 1179.11}, {"d": -14, "p": 1146.9}, {"d": -13, "p": 1175.41}, {"d": -12, "p": 1163.01}, {"d": -11, "p": 1185.87}, {"d": -10, "p": 1196.03}, {"d": -9, "p": 1197.53}, {"d": -8, "p": 1220.66}, {"d": -7, "p": 1210.02}, {"d": -6, "p": 1154.97}, {"d": -5, "p": 1148.84}, {"d": -4, "p": 1121.36}, {"d": -3, "p": 1115.68}, {"d": -2, "p": 1169.86}, {"d": -1, "p": 1191.94}, {"d": 0, "p": 1185.71}], "byTimeframe": {"1w": {"opportunityScore": 72, "risk": "Medium", "confidence": "Medium", "targetLabel": "1-2 Week Target", "scenarios": {"bear": {"price": 1154.41, "note": "A key pipeline readout disappoints or new competition erodes pricing power in its core drug classes."}, "base": {"price": 1192.59, "note": "Current blockbuster drugs continue their sales ramp roughly in line with recent trends."}, "bull": {"price": 1220.15, "note": "New indications and international expansion for its core drugs beat expectations."}}}, "1m": {"opportunityScore": 75, "risk": "Medium", "confidence": "Medium", "targetLabel": "1 Month Target", "scenarios": {"bear": {"price": 1131.64, "note": "A key pipeline readout disappoints or new competition erodes pricing power in its core drug classes."}, "base": {"price": 1199.23, "note": "Current blockbuster drugs continue their sales ramp roughly in line with recent trends."}, "bull": {"price": 1245.18, "note": "New indications and international expansion for its core drugs beat expectations."}}}, "3m": {"opportunityScore": 78, "risk": "Medium", "confidence": "High", "targetLabel": "3 Month Target", "scenarios": {"bear": {"price": 1097.49, "note": "A key pipeline readout disappoints or new competition erodes pricing power in its core drug classes."}, "base": {"price": 1210.42, "note": "Current blockbuster drugs continue their sales ramp roughly in line with recent trends."}, "bull": {"price": 1282.75, "note": "New indications and international expansion for its core drugs beat expectations."}}}, "6m": {"opportunityScore": 81, "risk": "Medium", "confidence": "High", "targetLabel": "6-9 Month Target", "scenarios": {"bear": {"price": 1043.42, "note": "A key pipeline readout disappoints or new competition erodes pricing power in its core drug classes."}, "base": {"price": 1229.82, "note": "Current blockbuster drugs continue their sales ramp roughly in line with recent trends."}, "bull": {"price": 1342.22, "note": "New indications and international expansion for its core drugs beat expectations."}}}, "1y": {"opportunityScore": 84, "risk": "Medium", "confidence": "High", "targetLabel": "12 Month Target", "scenarios": {"bear": {"price": 965.17, "note": "A key pipeline readout disappoints or new competition erodes pricing power in its core drug classes."}, "base": {"price": 1260.69, "note": "Current blockbuster drugs continue their sales ramp roughly in line with recent trends."}, "bull": {"price": 1428.31, "note": "New indications and international expansion for its core drugs beat expectations."}}}}, "evidence": {"developments": [{"title": "Eli Lilly rated \"Strong Buy\" on retatrutide and EBGLYSS progress", "detail": "Q2 revenue grew 48% on demand for Mounjaro and Zepbound, with positive phase 3 data for its next obesity drug.", "date": "2026-08-08"}, {"title": "Eli Lilly beats revenue estimates by 11%", "detail": "Analysts modestly raised earnings estimates following the beat, though the consensus price target held near $1,301.", "date": "2026-08-08"}, {"title": "Eli Lilly sets FDA filing timeline for next weight-loss drug", "detail": "Retatrutide is set for an FDA filing in early 2027, with trial data showing an edge over Novo Nordisk's Wegovy.", "date": "2026-08-07"}], "financialTrends": [{"metric": "Revenue Growth (YoY)", "trend": "up", "detail": "Growth remains very strong, led by its metabolic health and diabetes drug franchise.", "stat": "32%"}, {"metric": "Gross Margin", "trend": "up", "detail": "Margins remain high and stable, typical of a branded pharmaceutical leader.", "stat": "80%"}, {"metric": "R&D Spend (% of Revenue)", "trend": "up", "detail": "Investment in the pipeline continues to rise to extend growth beyond the current core franchise.", "stat": "25%"}, {"metric": "Free Cash Flow", "trend": "up", "detail": "Cash generation continues to grow alongside sales, despite continued capacity investment.", "stat": "+28%"}, {"metric": "Manufacturing Capacity", "trend": "up", "detail": "Capacity expansion continues in order to meet demand that has outpaced initial expectations.", "stat": "+40%"}], "catalysts": ["Continued prescription growth as manufacturing capacity catches up with demand", "New indications expanding the addressable patient population", "International launches of its core drug franchise"], "risks": ["Eventual patent expirations on key drugs later in the decade", "Pricing pressure from payers and policymakers on high-cost drugs", "Manufacturing execution risk while scaling capacity quickly"], "invalidation": ["A major pipeline trial for a core franchise reads out negatively", "Reimbursement or pricing policy changes materially cut into margins", "Growth decelerates sharply as competition intensifies in metabolic health"]}, "conclusionReason": "strong demand for its core drug franchise", "shortlist": {"status": "under_review", "rank": null, "addedDate": null, "selectionReason": null, "replacementNote": null}}, {"id": "exxonmobil", "ticker": "XOM", "name": "Exxon Mobil Corporation", "archetype": "macro_defensive", "archetypeLabel": "Macro Defensive", "sector": "Integrated Oil & Gas", "oneLiner": "An integrated energy major generating substantial free cash flow while gradually investing in lower-carbon projects.", "keyFinancials": {"marketCap": "$480B", "peRatio": 14.0, "revenueGrowthYoY": -2.0, "grossMargin": 34.0, "fcfYield": 7.8, "dividendYield": 3.6}, "price": {"current": 153.04, "periodHigh": 171.47, "periodLow": 136.06, "percentChange": -3.6, "relativePerformance": -18.9}, "priceHistory": [{"d": -99, "p": 158.81}, {"d": -98, "p": 157.59}, {"d": -97, "p": 158.16}, {"d": -96, "p": 159.67}, {"d": -95, "p": 161.13}, {"d": -94, "p": 165.38}, {"d": -93, "p": 163.26}, {"d": -92, "p": 165.43}, {"d": -91, "p": 170.99}, {"d": -90, "p": 171.47}, {"d": -89, "p": 169.66}, {"d": -88, "p": 160.78}, {"d": -87, "p": 160.69}, {"d": -86, "p": 163.37}, {"d": -85, "p": 163.91}, {"d": -84, "p": 156.22}, {"d": -83, "p": 155.04}, {"d": -82, "p": 152.51}, {"d": -81, "p": 152.64}, {"d": -80, "p": 149.24}, {"d": -79, "p": 149.01}, {"d": -78, "p": 151.98}, {"d": -77, "p": 146.44}, {"d": -76, "p": 147.68}, {"d": -75, "p": 148.36}, {"d": -74, "p": 149.5}, {"d": -73, "p": 150.53}, {"d": -72, "p": 148.91}, {"d": -71, "p": 148.19}, {"d": -70, "p": 150.56}, {"d": -69, "p": 154.67}, {"d": -68, "p": 154.33}, {"d": -67, "p": 152.75}, {"d": -66, "p": 153.69}, {"d": -65, "p": 154.88}, {"d": -64, "p": 148.69}, {"d": -63, "p": 146.58}, {"d": -62, "p": 144.57}, {"d": -61, "p": 149.68}, {"d": -60, "p": 150.63}, {"d": -59, "p": 151.57}, {"d": -58, "p": 152.78}, {"d": -57, "p": 157.92}, {"d": -56, "p": 160.49}, {"d": -55, "p": 162.55}, {"d": -54, "p": 156.28}, {"d": -53, "p": 155.29}, {"d": -52, "p": 154.92}, {"d": -51, "p": 149.81}, {"d": -50, "p": 147.9}, {"d": -49, "p": 146.96}, {"d": -48, "p": 145.26}, {"d": -47, "p": 149.38}, {"d": -46, "p": 149.56}, {"d": -45, "p": 152.53}, {"d": -44, "p": 152.04}, {"d": -43, "p": 149.92}, {"d": -42, "p": 151.75}, {"d": -41, "p": 148.91}, {"d": -40, "p": 150.62}, {"d": -39, "p": 146.6}, {"d": -38, "p": 147.01}, {"d": -37, "p": 140.92}, {"d": -36, "p": 141.86}, {"d": -35, "p": 140.74}, {"d": -34, "p": 137.81}, {"d": -33, "p": 138.47}, {"d": -32, "p": 139.73}, {"d": -31, "p": 136.9}, {"d": -30, "p": 137.55}, {"d": -29, "p": 136.54}, {"d": -28, "p": 136.06}, {"d": -27, "p": 136.72}, {"d": -26, "p": 136.28}, {"d": -25, "p": 137.09}, {"d": -24, "p": 136.44}, {"d": -23, "p": 141.69}, {"d": -22, "p": 141.13}, {"d": -21, "p": 137.46}, {"d": -20, "p": 138.88}, {"d": -19, "p": 144.51}, {"d": -18, "p": 145.09}, {"d": -17, "p": 144.51}, {"d": -16, "p": 145.95}, {"d": -15, "p": 147.36}, {"d": -14, "p": 148.36}, {"d": -13, "p": 151.71}, {"d": -12, "p": 154.45}, {"d": -11, "p": 156.89}, {"d": -10, "p": 156.94}, {"d": -9, "p": 154.77}, {"d": -8, "p": 153.04}, {"d": -7, "p": 156.75}, {"d": -6, "p": 156.97}, {"d": -5, "p": 155.44}, {"d": -4, "p": 155.06}, {"d": -3, "p": 153.96}, {"d": -2, "p": 151.63}, {"d": -1, "p": 154.84}, {"d": 0, "p": 153.04}], "byTimeframe": {"1w": {"opportunityScore": 60, "risk": "Medium", "confidence": "Medium", "targetLabel": "1-2 Week Target", "scenarios": {"bear": {"price": 148.99, "note": "Oil and gas prices fall further on weak demand or oversupply, pressuring cash flow."}, "base": {"price": 153.44, "note": "Energy prices stay roughly in the current range, supporting steady free cash flow and buybacks."}, "bull": {"price": 157.49, "note": "Energy prices firm up and high-return project startups add incremental production faster than planned."}}}, "1m": {"opportunityScore": 61, "risk": "Medium", "confidence": "Medium", "targetLabel": "1 Month Target", "scenarios": {"bear": {"price": 146.06, "note": "Oil and gas prices fall further on weak demand or oversupply, pressuring cash flow."}, "base": {"price": 153.8, "note": "Energy prices stay roughly in the current range, supporting steady free cash flow and buybacks."}, "bull": {"price": 160.72, "note": "Energy prices firm up and high-return project startups add incremental production faster than planned."}}}, "3m": {"opportunityScore": 63, "risk": "Medium", "confidence": "Medium", "targetLabel": "3 Month Target", "scenarios": {"bear": {"price": 141.65, "note": "Oil and gas prices fall further on weak demand or oversupply, pressuring cash flow."}, "base": {"price": 154.53, "note": "Energy prices stay roughly in the current range, supporting steady free cash flow and buybacks."}, "bull": {"price": 165.56, "note": "Energy prices firm up and high-return project startups add incremental production faster than planned."}}}, "6m": {"opportunityScore": 65, "risk": "Medium", "confidence": "Medium", "targetLabel": "6-9 Month Target", "scenarios": {"bear": {"price": 134.67, "note": "Oil and gas prices fall further on weak demand or oversupply, pressuring cash flow."}, "base": {"price": 155.79, "note": "Energy prices stay roughly in the current range, supporting steady free cash flow and buybacks."}, "bull": {"price": 173.24, "note": "Energy prices firm up and high-return project startups add incremental production faster than planned."}}}, "1y": {"opportunityScore": 67, "risk": "Medium", "confidence": "Medium", "targetLabel": "12 Month Target", "scenarios": {"bear": {"price": 124.58, "note": "Oil and gas prices fall further on weak demand or oversupply, pressuring cash flow."}, "base": {"price": 157.87, "note": "Energy prices stay roughly in the current range, supporting steady free cash flow and buybacks."}, "bull": {"price": 184.35, "note": "Energy prices firm up and high-return project startups add incremental production faster than planned."}}}}, "evidence": {"developments": [{"title": "ExxonMobil profit doubles to $14.5 billion", "detail": "Falling crude prices pressured the stock even as refining margins, not oil prices, are seen as the bigger swing factor ahead.", "date": "2026-08-09"}, {"title": "Exxon links $80 billion Kazakh oil venture to dispute resolution", "detail": "The new venture is tied to settling an ongoing dispute in the region.", "date": "2026-08-06"}, {"title": "Exxon challenges EU carbon storage rules", "detail": "The company is using investor-protection treaties to push back on new EU climate requirements.", "date": "2026-08-07"}], "financialTrends": [{"metric": "Free Cash Flow", "trend": "flat", "detail": "Cash flow remains substantial, though it is moderating somewhat alongside energy prices.", "stat": "Stable"}, {"metric": "Production Volumes", "trend": "up", "detail": "Production continues to grow as high-return projects come online.", "stat": "+4%"}, {"metric": "Capital Expenditures", "trend": "flat", "detail": "Spending remains disciplined and focused on the highest-return projects.", "stat": "Disciplined"}, {"metric": "Net Debt", "trend": "down", "detail": "The balance sheet continues to strengthen as debt is paid down.", "stat": "-12%"}, {"metric": "Low-Carbon Investment", "trend": "up", "detail": "Investment in carbon capture and lower-carbon fuels continues to grow, though it remains a small share of total spending.", "stat": "+20%"}], "catalysts": ["New high-return production projects continuing to ramp up", "Continued capital discipline supporting buybacks and dividends", "Growth in lower-carbon business lines over time"], "risks": ["Cash flow is highly sensitive to global oil and gas prices", "Long-term demand risk as the energy transition progresses", "Large project execution risk on new developments"], "invalidation": ["Oil and gas prices fall sharply and stay low for an extended period", "A major production project is significantly delayed or over budget", "The dividend or buyback program is cut"]}, "conclusionReason": "disciplined spending and steady cash generation", "shortlist": {"status": "active", "rank": 4, "addedDate": "2026-08-01", "selectionReason": "Disciplined spending and steady cash generation offer a favorable value-oriented profile.", "replacementNote": null}}, {"id": "costco", "ticker": "COST", "name": "Costco Wholesale Corporation", "archetype": "macro_defensive", "archetypeLabel": "Macro Defensive", "sector": "Warehouse Retail & Membership", "oneLiner": "A membership-based warehouse retailer known for exceptional customer loyalty and consistent, if unglamorous, growth.", "keyFinancials": {"marketCap": "$430B", "peRatio": 52.0, "revenueGrowthYoY": 7.0, "grossMargin": 13.0, "fcfYield": 2.0, "dividendYield": 0.5}, "price": {"current": 947.82, "periodHigh": 1094.32, "periodLow": 912.97, "percentChange": -4.9, "relativePerformance": -20.1}, "priceHistory": [{"d": -99, "p": 996.16}, {"d": -98, "p": 979.92}, {"d": -97, "p": 974.78}, {"d": -96, "p": 972.33}, {"d": -95, "p": 965.73}, {"d": -94, "p": 973.82}, {"d": -93, "p": 974.86}, {"d": -92, "p": 979.65}, {"d": -91, "p": 983.86}, {"d": -90, "p": 996.58}, {"d": -89, "p": 996.43}, {"d": -88, "p": 996.56}, {"d": -87, "p": 1014.96}, {"d": -86, "p": 1018.55}, {"d": -85, "p": 1013.21}, {"d": -84, "p": 1030.27}, {"d": -83, "p": 1032.03}, {"d": -82, "p": 998.47}, {"d": -81, "p": 980.85}, {"d": -80, "p": 974.8}, {"d": -79, "p": 984.75}, {"d": -78, "p": 987.21}, {"d": -77, "p": 999.89}, {"d": -76, "p": 997.84}, {"d": -75, "p": 1005.81}, {"d": -74, "p": 1003.7}, {"d": -73, "p": 1014.38}, {"d": -72, "p": 1011.15}, {"d": -71, "p": 998.01}, {"d": -70, "p": 994.0}, {"d": -69, "p": 998.67}, {"d": -68, "p": 1014.53}, {"d": -67, "p": 1011.7}, {"d": -66, "p": 1012.79}, {"d": -65, "p": 1016.42}, {"d": -64, "p": 995.75}, {"d": -63, "p": 1012.06}, {"d": -62, "p": 1008.79}, {"d": -61, "p": 999.47}, {"d": -60, "p": 1021.88}, {"d": -59, "p": 1033.08}, {"d": -58, "p": 1041.25}, {"d": -57, "p": 1048.95}, {"d": -56, "p": 1076.47}, {"d": -55, "p": 1094.32}, {"d": -54, "p": 1074.01}, {"d": -53, "p": 1050.45}, {"d": -52, "p": 1028.24}, {"d": -51, "p": 1002.93}, {"d": -50, "p": 1003.69}, {"d": -49, "p": 995.2}, {"d": -48, "p": 956.32}, {"d": -47, "p": 946.11}, {"d": -46, "p": 954.27}, {"d": -45, "p": 961.83}, {"d": -44, "p": 972.35}, {"d": -43, "p": 971.87}, {"d": -42, "p": 974.75}, {"d": -41, "p": 968.59}, {"d": -40, "p": 983.37}, {"d": -39, "p": 975.69}, {"d": -38, "p": 982.35}, {"d": -37, "p": 979.45}, {"d": -36, "p": 986.68}, {"d": -35, "p": 965.59}, {"d": -34, "p": 951.45}, {"d": -33, "p": 951.35}, {"d": -32, "p": 957.68}, {"d": -31, "p": 961.09}, {"d": -30, "p": 942.24}, {"d": -29, "p": 952.54}, {"d": -28, "p": 946.68}, {"d": -27, "p": 935.47}, {"d": -26, "p": 924.67}, {"d": -25, "p": 951.67}, {"d": -24, "p": 950.25}, {"d": -23, "p": 947.5}, {"d": -22, "p": 953.13}, {"d": -21, "p": 912.97}, {"d": -20, "p": 916.25}, {"d": -19, "p": 926.43}, {"d": -18, "p": 921.75}, {"d": -17, "p": 916.54}, {"d": -16, "p": 945.57}, {"d": -15, "p": 940.87}, {"d": -14, "p": 935.8}, {"d": -13, "p": 929.22}, {"d": -12, "p": 927.31}, {"d": -11, "p": 926.06}, {"d": -10, "p": 935.03}, {"d": -9, "p": 951.58}, {"d": -8, "p": 966.58}, {"d": -7, "p": 974.03}, {"d": -6, "p": 954.17}, {"d": -5, "p": 951.89}, {"d": -4, "p": 954.08}, {"d": -3, "p": 947.85}, {"d": -2, "p": 941.99}, {"d": -1, "p": 949.15}, {"d": 0, "p": 947.82}], "byTimeframe": {"1w": {"opportunityScore": 74, "risk": "Low", "confidence": "High", "targetLabel": "1-2 Week Target", "scenarios": {"bear": {"price": 935.31, "note": "Membership renewal rates soften or a weaker consumer pulls back on discretionary big-ticket items."}, "base": {"price": 953.83, "note": "Membership growth and comparable sales continue at a pace similar to recent quarters."}, "bull": {"price": 961.59, "note": "Membership fee increases and new warehouse openings both land better than expected."}}}, "1m": {"opportunityScore": 75, "risk": "Low", "confidence": "High", "targetLabel": "1 Month Target", "scenarios": {"bear": {"price": 926.21, "note": "Membership renewal rates soften or a weaker consumer pulls back on discretionary big-ticket items."}, "base": {"price": 958.63, "note": "Membership growth and comparable sales continue at a pace similar to recent quarters."}, "bull": {"price": 971.59, "note": "Membership fee increases and new warehouse openings both land better than expected."}}}, "3m": {"opportunityScore": 77, "risk": "Low", "confidence": "High", "targetLabel": "3 Month Target", "scenarios": {"bear": {"price": 912.56, "note": "Membership renewal rates soften or a weaker consumer pulls back on discretionary big-ticket items."}, "base": {"price": 966.86, "note": "Membership growth and comparable sales continue at a pace similar to recent quarters."}, "bull": {"price": 986.61, "note": "Membership fee increases and new warehouse openings both land better than expected."}}}, "6m": {"opportunityScore": 79, "risk": "Low", "confidence": "High", "targetLabel": "6-9 Month Target", "scenarios": {"bear": {"price": 890.95, "note": "Membership renewal rates soften or a weaker consumer pulls back on discretionary big-ticket items."}, "base": {"price": 980.8, "note": "Membership growth and comparable sales continue at a pace similar to recent quarters."}, "bull": {"price": 1010.38, "note": "Membership fee increases and new warehouse openings both land better than expected."}}}, "1y": {"opportunityScore": 81, "risk": "Low", "confidence": "High", "targetLabel": "12 Month Target", "scenarios": {"bear": {"price": 859.68, "note": "Membership renewal rates soften or a weaker consumer pulls back on discretionary big-ticket items."}, "base": {"price": 1002.47, "note": "Membership growth and comparable sales continue at a pace similar to recent quarters."}, "bull": {"price": 1044.78, "note": "Membership fee increases and new warehouse openings both land better than expected."}}}}, "evidence": {"developments": [{"title": "Costco July sales rise 10.7% year-over-year", "detail": "Net sales reached $23.12 billion for the month, though shares slipped slightly on the news.", "date": "2026-08-07"}, {"title": "Costco locks in new Escondido, CA location", "detail": "After years of false starts, the city council is set to approve a 20-year lease expected to create over 300 jobs.", "date": "2026-08-06"}, {"title": "Costco opens new location at Crossgates Mall in Albany, NY", "detail": "The store is the only Costco in the Capital Region and is expected to boost regional traffic and employment.", "date": "2026-08-06"}], "financialTrends": [{"metric": "Comparable Sales Growth", "trend": "up", "detail": "Comparable sales growth remains healthy and consistent across regions.", "stat": "+7%"}, {"metric": "Membership Renewal Rate", "trend": "flat", "detail": "Renewal rates remain near record highs, reflecting strong customer loyalty.", "stat": "92.7%"}, {"metric": "Membership Fee Income", "trend": "up", "detail": "Fee income has stepped up following the recent membership fee increase.", "stat": "+8%"}, {"metric": "Gross Margin", "trend": "flat", "detail": "Margins remain structurally thin by design, consistent with the company's value-pricing model.", "stat": "13%"}, {"metric": "New Warehouse Openings", "trend": "up", "detail": "The pace of new warehouse openings continues at a steady, disciplined rate.", "stat": "+3%"}], "catalysts": ["Continued strong membership renewal and fee income growth", "Steady new warehouse openings in existing and new markets", "Resilient comparable sales even in a mixed consumer spending environment"], "risks": ["Slim margins leave less room for cost inflation surprises", "A weaker consumer could pressure big-ticket discretionary categories", "Rich valuation relative to a low-growth retail business model"], "invalidation": ["Membership renewal rates decline meaningfully", "Comparable sales growth turns negative for multiple quarters", "New warehouse expansion slows sharply"]}, "conclusionReason": "exceptional membership loyalty and steady growth", "shortlist": {"status": "active", "rank": 5, "addedDate": "2026-08-01", "selectionReason": "Exceptional membership loyalty and consistent growth support high-confidence, established-leader stability.", "replacementNote": null}}], "portfolio": {"totalInvested": 14415.0, "holdingsValue": 17721.3, "cashAvailable": 1250.0, "portfolioValue": 18971.3, "totalGainLossDollar": 3306.3, "totalGainLossPercent": 22.9, "positionsCount": 3, "holdings": [{"companyId": "solara", "shares": 40, "costBasis": 165.0, "costTotal": 6600.0, "currentValue": 8572.8, "gainLossDollar": 1972.8, "gainLossPercent": 29.9}, {"companyId": "nimbus", "shares": 150, "costBasis": 22.5, "costTotal": 3375.0, "currentValue": 5722.5, "gainLossDollar": 2347.5, "gainLossPercent": 69.6}, {"companyId": "anchorline", "shares": 300, "costBasis": 14.8, "costTotal": 4440.0, "currentValue": 3426.0, "gainLossDollar": -1014.0, "gainLossPercent": -22.8}]}, "alerts": [{"id": "a21", "companyId": "nvidia", "replacedCompanyId": "disney", "date": "2026-08-06", "triggerType": "shortlist_change", "triggerLabel": "Current Top 5 Update", "title": "NVDA replaces DIS in the Current Top 5", "whatHappened": "NVDA entered the Current Top 5 after showing stronger earnings momentum and a more favorable six-month risk-reward profile.", "whyItMatters": "DIS left the Current Top 5 after its Opportunity Score weakened and consumer-spending risk increased."}, {"id": "a01", "companyId": "solara", "date": "2026-07-14", "triggerType": "news_thesis", "title": "New contracts extend revenue visibility", "whatHappened": "Solara signed multi-year cloud capacity agreements with two additional Fortune 500 customers.", "whyItMatters": "Multi-year commitments extend revenue visibility and reduce the risk that demand cools before the next earnings cycle.", "thesisStatus": "Strengthened", "triggerLabel": "News Update"}, {"id": "a02", "companyId": "solara", "date": "2026-07-29", "triggerType": "attractive_range", "title": "Trading below its Most Likely target for the 1 Week view", "whatHappened": "SOLR is trading at $214.32, inside its Worst-Case-to-Most-Likely range of $205-$217 for the 1 Week view.", "whyItMatters": "Sitting below the central case despite strong fundamentals is exactly the kind of gap the shortlist is built to surface.", "thesisStatus": "Still Valid", "triggerLabel": "Price Range"}, {"id": "a03", "companyId": "nimbus", "date": "2026-07-08", "triggerType": "news_thesis", "title": "First multi-facility contract won", "whatHappened": "Nimbus won its first multi-facility deployment contract with a mid-size automotive parts manufacturer.", "whyItMatters": "First contract at this scale is the strongest evidence yet that the commercial thesis, not just the pilot-stage story, is real.", "thesisStatus": "Strengthened", "triggerLabel": "News Update"}, {"id": "a04", "companyId": "nimbus", "date": "2026-07-25", "triggerType": "risk_crossed", "title": "Price low stayed clear of the 1 Month stop-loss", "whatHappened": "NMBS's trailing 6-month low of $26.37 stayed above the $29 stop-loss level for the 1 Month view, but the gap is narrow.", "whyItMatters": "For a speculative name like this, distance from the stop-loss line matters as much as the upside case.", "thesisStatus": "Still Valid", "triggerLabel": "Risk Check"}, {"id": "a05", "companyId": "anchorline", "date": "2026-07-10", "triggerType": "financial_outlook", "title": "Operating margin improved again", "whatHappened": "Operating margin improved from -4% to -1% as cost cuts take hold.", "whyItMatters": "A turnaround thesis lives or dies on the pace of margin recovery -- this is the second straight quarter of improvement.", "thesisStatus": "Strengthened", "triggerLabel": "Financial Update"}, {"id": "a06", "companyId": "anchorline", "date": "2026-07-27", "triggerType": "risk_crossed", "title": "Price came within range of the stop-loss level", "whatHappened": "ANCR's 6-month low of $10.99 stayed above the $8.00 stop-loss trigger for the 1 Month view, but only narrowly.", "whyItMatters": "A turnaround thesis has little room for error -- this is worth watching closely rather than treating as resolved.", "thesisStatus": "Weakened", "triggerLabel": "Risk Check"}, {"id": "a07", "companyId": "nvidia", "date": "2026-07-30", "triggerType": "attractive_range", "title": "Tracking almost exactly at its 1 Week target", "whatHappened": "NVDA is trading at $142.80, just below its Most Likely target of $143.78 for the 1 Week view.", "whyItMatters": "Tracking the base case this closely is a sign the current view isn't relying on an optimistic scenario to be right.", "thesisStatus": "Still Valid", "triggerLabel": "Price Range"}, {"id": "a08", "companyId": "nvidia", "date": "2026-07-18", "triggerType": "news_thesis", "title": "Next-generation AI accelerator platform announced", "whatHappened": "Nvidia announced its next-generation AI accelerator platform, with early customer previews pointing to another step up in performance per watt.", "whyItMatters": "Extending the product lead is the single biggest lever behind the growth-leader case for this stock.", "thesisStatus": "Strengthened", "triggerLabel": "News Update"}, {"id": "a09", "companyId": "palantir", "date": "2026-07-31", "triggerType": "score_change", "title": "Opportunity score moved higher", "whatHappened": "PLTR's opportunity score for the 6 Month view has risen to 73, up from the high 60s a quarter ago.", "whyItMatters": "The increase tracks two consecutive quarters of accelerating commercial revenue, the most important signal for this name.", "thesisStatus": "Strengthened", "triggerLabel": "Score Change"}, {"id": "a10", "companyId": "palantir", "date": "2026-07-24", "triggerType": "news_thesis", "title": "Commercial revenue growth accelerating", "whatHappened": "Palantir reported accelerating commercial revenue growth for a second consecutive quarter.", "whyItMatters": "Acceleration, not just growth, is what would justify the stock re-rating further from here.", "thesisStatus": "Strengthened", "triggerLabel": "News Update"}, {"id": "a11", "companyId": "disney", "date": "2026-07-09", "triggerType": "financial_outlook", "title": "Streaming margin keeps improving", "whatHappened": "Direct-to-consumer profitability keeps improving as the business moves past its heaviest investment phase.", "whyItMatters": "Streaming profitability is the central pillar of the turnaround case -- continued improvement supports it.", "thesisStatus": "Strengthened", "triggerLabel": "Financial Update"}, {"id": "a12", "companyId": "disney", "date": "2026-07-30", "triggerType": "attractive_range", "title": "Trading almost exactly at its 1 Week target", "whatHappened": "DIS is trading at $115.20, almost exactly at its Most Likely target of $115.14 for the 1 Week view.", "whyItMatters": "The market and the model are reading the turnaround similarly right now -- useful context if the price starts to diverge.", "thesisStatus": "Still Valid", "triggerLabel": "Price Range"}, {"id": "a13", "companyId": "jpmorgan", "date": "2026-07-20", "triggerType": "financial_outlook", "title": "Return on tangible equity remains a standout", "whatHappened": "Profitability metrics remain among the strongest in the industry.", "whyItMatters": "Consistent best-in-class returns are exactly what the value-champion case depends on.", "thesisStatus": "Strengthened", "triggerLabel": "Financial Update"}, {"id": "a14", "companyId": "jpmorgan", "date": "2026-07-01", "triggerType": "news_thesis", "title": "Continued share gains in trading and banking", "whatHappened": "JPMorgan continued to gain market share in trading and investment banking fee pools.", "whyItMatters": "Share gains in fee businesses add upside on top of the steady net-interest-income base case.", "thesisStatus": "Strengthened", "triggerLabel": "News Update"}, {"id": "a15", "companyId": "elililly", "date": "2026-07-31", "triggerType": "attractive_range", "title": "Tracking just under its 1 Week target", "whatHappened": "LLY is trading at $825, just under its Most Likely target of $829.79 for the 1 Week view.", "whyItMatters": "Consistent tracking with the base case supports the idea that current pricing isn't dependent on a best-case outcome.", "thesisStatus": "Still Valid", "triggerLabel": "Price Range"}, {"id": "a16", "companyId": "elililly", "date": "2026-07-05", "triggerType": "news_thesis", "title": "Positive late-stage trial results", "whatHappened": "A late-stage trial expanding a core drug into a new indication read out positively.", "whyItMatters": "New indications extend the growth runway well beyond the current core franchise.", "thesisStatus": "Strengthened", "triggerLabel": "News Update"}, {"id": "a17", "companyId": "exxonmobil", "date": "2026-07-22", "triggerType": "financial_outlook", "title": "Free cash flow moderating with energy prices", "whatHappened": "Cash flow remains substantial, though it is moderating somewhat alongside energy prices.", "whyItMatters": "Free cash flow is the core of this stock's case -- a real slowdown here would matter more than most other signals.", "thesisStatus": "Weakened", "triggerLabel": "Financial Update"}, {"id": "a18", "companyId": "exxonmobil", "date": "2026-07-08", "triggerType": "news_thesis", "title": "Low-cost production project started ahead of schedule", "whatHappened": "A major low-cost production project started up ahead of schedule, adding incremental output.", "whyItMatters": "Early, low-cost production growth partly offsets the softer pricing backdrop.", "thesisStatus": "Strengthened", "triggerLabel": "News Update"}, {"id": "a19", "companyId": "costco", "date": "2026-07-26", "triggerType": "financial_outlook", "title": "Membership fee raised", "whatHappened": "Costco raised its membership fee for the first time in several years.", "whyItMatters": "Fee income is high-margin and recurring -- an increase flows almost directly to profit.", "thesisStatus": "Strengthened", "triggerLabel": "Financial Update"}, {"id": "a20", "companyId": "costco", "date": "2026-07-12", "triggerType": "news_thesis", "title": "Membership renewal rates remain near record highs", "whatHappened": "Membership renewal rates remained near record highs across all regions.", "whyItMatters": "Renewal rate is the best single proxy for the loyalty this business depends on.", "thesisStatus": "Still Valid", "triggerLabel": "News Update"}]};
+/* S&P 20 — demo prototype (watchlist + scrolling detail page)
+ * All data comes from data/companies.json. Swap that file for a live feed
+ * later without touching this file or the markup structure below.
+ * IMPORTANT: every score, price target, and financial figure here is
+ * fabricated demo data — see meta.disclosure.
+ */
+
+// S&P 20 ships in dark mode only - one fixed palette, no theme switching.
+const CHART_COLORS = { good: "#30D158", bad: "#FF453A", neutral: "#9AA0A6", border: "#303236", faint: "#9AA0A6" };
+
+function chartColors() {
+  return CHART_COLORS;
+}
+
+const TIMEFRAME_DAYS = { "1w": 6, "1m": 22, "3m": 64, "6m": 127, "1y": 253 };
+
+const BAND_SLUGS = {
+  "Strong Opportunity": "strong",
+  "Attractive": "attractive",
+  "Watch": "watch",
+  "Cautious": "cautious",
+  "Avoid For Now": "avoid",
+};
+
+const CONFIDENCE_BADGE = {
+  High: { label: "High", slug: "high", rationale: "Backed by consistent trends and strong supporting evidence for this timeframe." },
+  Medium: { label: "Medium", slug: "medium", rationale: "Reasonable supporting evidence, but some factors remain uncertain." },
+  Low: { label: "Speculative", slug: "speculative", rationale: "Limited evidence or early-stage signals for this timeframe — treat with caution." },
+};
+
+const RISK_METER_PCT = { Low: 20, Medium: 55, High: 88 };
+
+const BAND_CONNECTOR = {
+  "Strong Opportunity": "supported by",
+  "Attractive": "supported by",
+  "Watch": "balanced by",
+  "Cautious": "tempered by",
+  "Avoid For Now": "tempered by",
+};
+
+// Which of the three directional signals is emphasized, driven by the same
+// score band already used for the verdict — no separate probability data.
+const BAND_DIRECTION = {
+  "Strong Opportunity": "up",
+  "Attractive": "up",
+  "Watch": "steady",
+  "Cautious": "down",
+  "Avoid For Now": "down",
+};
+
+const state = {
+  data: null,
+  timeframe: null,
+  selectedCompanyId: null,
+  activeScenario: "base",
+  chartGranularity: "day", // "day" | "week" | "month" - only applied on the 3-Month view
+};
+
+function init() {
+  state.data = DATA;
+  state.timeframe = state.data.meta.timeframes[2].id; // default to 3 months
+
+  renderDisclosureFooter();
+  renderLastUpdate();
+  renderTimeframeChips();
+  renderWatchlist();
+  renderAlerts();
+
+  document.getElementById("btnBack").addEventListener("click", () => {
+    document.getElementById("app").classList.remove("detail-active");
+  });
+
+  document.getElementById("alertsToggle").addEventListener("click", () => {
+    document.getElementById("alertsOverlay").classList.add("is-open");
+  });
+  document.getElementById("alertsClose").addEventListener("click", () => {
+    document.getElementById("alertsOverlay").classList.remove("is-open");
+  });
+  document.getElementById("alertsOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "alertsOverlay") e.currentTarget.classList.remove("is-open");
+  });
+}
+
+/* ---------------- alerts ---------------- */
+
+const THESIS_STATUS_SLUGS = {
+  "Strengthened": "strengthened",
+  "Still Valid": "still-valid",
+  "Weakened": "weakened",
+  "Invalidated": "invalidated",
+};
+
+function renderAlerts() {
+  const list = document.getElementById("alertsList");
+  const alerts = (state.data.alerts || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+  const dot = document.getElementById("alertsDot");
+  if (dot) dot.classList.toggle("is-hidden", alerts.length === 0);
+
+  list.innerHTML = "";
+  alerts.forEach((a) => {
+    const c = getCompany(a.companyId);
+    const isShortlistChange = a.triggerType === "shortlist_change";
+    const card = document.createElement("div");
+    card.className = "alert-card";
+
+    let companyLabel = `${c.ticker} &middot; ${c.name}`;
+    let badgesHtml = "";
+    let bodyHtml = "";
+
+    if (isShortlistChange) {
+      const leaving = getCompany(a.replacedCompanyId);
+      companyLabel = leaving ? `${c.ticker} &middot; ${leaving.ticker}` : `${c.ticker}`;
+      badgesHtml = `<span class="alert-badge status-shortlist">${a.triggerLabel || "Top 5 Update"}</span>`;
+      bodyHtml = `
+        <p><span class="lbl">Entered:</span> ${a.whatHappened}</p>
+        <p><span class="lbl">Left:</span> ${a.whyItMatters}</p>
+      `;
+    } else {
+      const statusSlug = THESIS_STATUS_SLUGS[a.thesisStatus] || "still-valid";
+      badgesHtml = `
+        <span class="alert-badge">${a.triggerLabel}</span>
+        <span class="alert-badge status-${statusSlug}">${a.thesisStatus}</span>
+      `;
+      bodyHtml = `
+        <p><span class="lbl">What happened:</span> ${a.whatHappened}</p>
+        <p><span class="lbl">Why it matters:</span> ${a.whyItMatters}</p>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="alert-card-top">
+        <span class="alert-company">${companyLabel}</span>
+        <span class="alert-date">${a.date}</span>
+      </div>
+      <div class="alert-badges">${badgesHtml}</div>
+      <div class="alert-title">${a.title}</div>
+      <div class="alert-body">${bodyHtml}</div>
+    `;
+    card.addEventListener("click", () => {
+      document.getElementById("alertsOverlay").classList.remove("is-open");
+      state.selectedCompanyId = a.companyId;
+      state.activeScenario = "base";
+      renderWatchlist();
+      renderDetail(a.companyId);
+      document.getElementById("app").classList.add("detail-active");
+      const scroller = document.getElementById("detailScroll");
+      if (typeof scroller.scrollTo === "function") scroller.scrollTo({ top: 0 });
+      else scroller.scrollTop = 0;
+    });
+    list.appendChild(card);
+  });
+}
+
+/* ---------------- helpers ---------------- */
+
+function getCompany(id) {
+  return state.data.companies.find((c) => c.id === id);
+}
+
+function timeframeLabel(id) {
+  return state.data.meta.timeframes.find((t) => t.id === id).label;
+}
+
+function scoreBand(score) {
+  return state.data.meta.scoreBands.find((b) => score >= b.min && score <= b.max);
+}
+
+function bandSlug(label) {
+  return BAND_SLUGS[label] || "watch";
+}
+
+function riskClass(level) {
+  return "risk-" + level.toLowerCase();
+}
+
+function trendClass(trend) {
+  return "trend-" + trend.toLowerCase();
+}
+
+function trendArrow(trend) {
+  if (trend === "up") return "▲";
+  if (trend === "down") return "▼";
+  return "→";
+}
+
+function fmtMoney(n) {
+  const sign = n < 0 ? "-" : "";
+  return sign + "$" + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtMoney0(n) {
+  const sign = n < 0 ? "-" : "";
+  return sign + "$" + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function fmtPct(n) {
+  const sign = n > 0 ? "+" : "";
+  return sign + n.toFixed(1) + "%";
+}
+
+function fmtPlainPct(n) {
+  return n.toFixed(1) + "%";
+}
+
+function sliceHistory(history, tfId) {
+  const n = TIMEFRAME_DAYS[tfId] || history.length;
+  return history.slice(-n);
+}
+
+/* ---------------- calendar dates for chart points ---------------- */
+// priceHistory only stores a trading-day offset ("d") relative to
+// meta.asOfDate, not an actual date string. This walks back that many
+// weekday-only trading days from asOfDate to recover a real calendar date
+// for axis labels and week/month bucketing.
+function tradingDayDate(asOfDateStr, offset) {
+  const d = new Date(asOfDateStr + "T00:00:00");
+  let remaining = -offset;
+  while (remaining > 0) {
+    d.setDate(d.getDate() - 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) remaining -= 1;
+  }
+  return d;
+}
+
+function fmtAxisDate(date) {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function isoWeekKey(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${week}`;
+}
+
+// Resamples a chronological (ascending) priceHistory slice down to one
+// point per week or month, keeping the last (most recent) close in each
+// bucket. "day" is a no-op passthrough. Only meaningful on windows with
+// enough points to bucket - currently only offered on the 3-Month view.
+function resampleHistory(slice, asOfDateStr, granularity) {
+  if (granularity === "day" || slice.length <= 1) return slice;
+  const keyFor = granularity === "week"
+    ? (date) => isoWeekKey(date)
+    : (date) => `${date.getFullYear()}-${date.getMonth()}`;
+  const buckets = new Map();
+  slice.forEach((pt) => {
+    const date = tradingDayDate(asOfDateStr, pt.d);
+    buckets.set(keyFor(date), pt); // later (more recent) points overwrite earlier ones in the same bucket
+  });
+  return Array.from(buckets.values());
+}
+
+function statsForSlice(slice) {
+  const prices = slice.map((pt) => pt.p);
+  const open = prices[0];
+  const current = prices[prices.length - 1];
+  const high = Math.max(...prices);
+  const low = Math.min(...prices);
+  const changePct = ((current / open) - 1) * 100;
+  return { open, current, high, low, changePct };
+}
+
+/* ---------------- chart rendering (inline SVG) ---------------- */
+
+let chartIdCounter = 0;
+
+function buildChart(slice, opts) {
+  const {
+    width, height,
+    padLeft = 0, padRight = 0, padTop = 0, padBottom = 0,
+    showLabels = false, showDates = false,
+    projection = null, // { price, color, label }
+  } = opts;
+
+  const prices = slice.map((pt) => pt.p);
+  const allValues = projection ? prices.concat([projection.price]) : prices;
+  let min = Math.min(...allValues);
+  let max = Math.max(...allValues);
+  if (min === max) { min -= 1; max += 1; }
+  const pad = (max - min) * 0.14;
+  min -= pad;
+  max += pad;
+
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBottom;
+  const projFrac = projection ? 0.2 : 0;
+  const histW = innerW * (1 - projFrac);
+
+  const xFor = (i) => padLeft + (slice.length === 1 ? 0 : (i / (slice.length - 1)) * histW);
+  const yFor = (p) => padTop + innerH - ((p - min) / (max - min)) * innerH;
+
+  const linePts = slice.map((pt, i) => `${xFor(i).toFixed(1)},${yFor(pt.p).toFixed(1)}`);
+  const lineD = "M" + linePts.join(" L");
+  const baseY = (padTop + innerH).toFixed(1);
+  const areaD = `${lineD} L${xFor(slice.length - 1).toFixed(1)},${baseY} L${xFor(0).toFixed(1)},${baseY} Z`;
+
+  const cc = chartColors();
+  const up = prices[prices.length - 1] >= prices[0];
+  const color = up ? cc.good : cc.bad;
+
+  let extra = "";
+  if (showLabels) {
+    const steps = 3;
+    for (let s = 0; s <= steps; s++) {
+      const val = min + (max - min) * (s / steps);
+      const y = yFor(val);
+      extra += `<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${(padLeft + innerW).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${cc.border}" stroke-width="1" />`;
+      extra += `<text x="${width - 2}" y="${(y - 4).toFixed(1)}" text-anchor="end" font-size="10" fill="${cc.faint}">${val.toFixed(2)}</text>`;
+    }
+  }
+  if (showDates && opts.asOfDate) {
+    const tickCount = Math.min(4, slice.length);
+    for (let t = 0; t < tickCount; t++) {
+      const idx = tickCount === 1 ? slice.length - 1 : Math.round((t / (tickCount - 1)) * (slice.length - 1));
+      const label = fmtAxisDate(tradingDayDate(opts.asOfDate, slice[idx].d));
+      const anchor = t === 0 ? "start" : (t === tickCount - 1 ? "end" : "middle");
+      extra += `<text x="${xFor(idx).toFixed(1)}" y="${height - 4}" font-size="10" fill="${cc.faint}" text-anchor="${anchor}">${label}</text>`;
+    }
+  } else if (showDates) {
+    extra += `<text x="${padLeft}" y="${height - 4}" font-size="10" fill="${cc.faint}">${slice.length}d ago</text>`;
+    extra += `<text x="${(padLeft + histW).toFixed(1)}" y="${height - 4}" font-size="10" fill="${cc.faint}" text-anchor="middle">Today</text>`;
+  }
+
+  let projSvg = "";
+  if (projection) {
+    const x0 = padLeft + histW;
+    const y0 = yFor(prices[prices.length - 1]);
+    const x1 = padLeft + innerW;
+    const y1 = yFor(projection.price);
+    projSvg = `
+      <line x1="${x0.toFixed(1)}" y1="${padTop}" x2="${x0.toFixed(1)}" y2="${(padTop + innerH).toFixed(1)}" stroke="${cc.border}" stroke-width="1" stroke-dasharray="2,3" />
+      <path d="M${x0.toFixed(1)},${y0.toFixed(1)} L${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="${projection.color}" stroke-width="2.4" stroke-dasharray="5,4" stroke-linecap="round" />
+      <circle cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="4" fill="${projection.color}" stroke="#fff" stroke-width="1.5" />
+      <text x="${x1.toFixed(1)}" y="${(y1 - 8).toFixed(1)}" text-anchor="end" font-size="10" font-weight="700" fill="${projection.color}">${projection.label}</text>
+    `;
+  }
+
+  chartIdCounter += 1;
+  const gid = "chartGrad" + chartIdCounter;
+
+  return `<svg viewBox="0 0 ${width} ${height}">
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.32" />
+        <stop offset="100%" stop-color="${color}" stop-opacity="0" />
+      </linearGradient>
+    </defs>
+    ${extra}
+    <path d="${areaD}" fill="url(#${gid})" stroke="none" />
+    <path d="${lineD}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />
+    ${projSvg}
+  </svg>`;
+}
+
+/* ---------------- disclosure ---------------- */
+
+function renderDisclosureFooter() {
+  document.getElementById("disclosureFooter").textContent = state.data.meta.disclosure;
+}
+
+function renderLastUpdate() {
+  const el = document.getElementById("lastUpdate");
+  const iso = state.data.meta.lastUpdated;
+  if (!el || !iso) return;
+  const d = new Date(iso);
+  const formatted = isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+  el.textContent = `Updated ${formatted}`;
+  el.title = "Real prices and news for NVDA, PLTR, DIS, JPM, LLY, XOM, and COST refresh once daily.";
+}
+
+/* ---------------- timeframe chips (list pane) ---------------- */
+
+const LOCKED_TIMEFRAME_MSG = "6-month and 1-year history are part of S&P 20 Premium.";
+
+function renderTimeframeChips() {
+  renderTimeframeChipsInto(document.getElementById("timeframeChips"), document.getElementById("timeframeLockMsg"));
+}
+
+function renderTimeframeChipsInto(container, msgEl) {
+  container.innerHTML = "";
+  if (msgEl) {
+    msgEl.textContent = "";
+    msgEl.classList.remove("is-visible");
+  }
+  state.data.meta.timeframes.forEach((tf) => {
+    const locked = !!tf.locked;
+    const chip = document.createElement("button");
+    chip.className = "chip" + (tf.id === state.timeframe ? " is-selected" : "") + (locked ? " is-locked" : "");
+    chip.innerHTML = locked ? `<span class="lock-ic">&#128274;</span>${tf.label}` : tf.label;
+    chip.addEventListener("click", () => {
+      if (locked) {
+        if (msgEl) {
+          msgEl.textContent = LOCKED_TIMEFRAME_MSG;
+          msgEl.classList.add("is-visible");
+        }
+        return;
+      }
+      state.timeframe = tf.id;
+      rerenderAll();
+    });
+    container.appendChild(chip);
+  });
+}
+
+function rerenderAll() {
+  renderTimeframeChips();
+  renderWatchlist();
+  if (state.selectedCompanyId) renderDetail(state.selectedCompanyId);
+}
+
+/* ---------------- watchlist (left pane list) ---------------- */
+
+const SHORTLIST_SIZE = 5;
+
+function currentTopFive() {
+  return state.data.companies
+    .filter((c) => c.shortlist && c.shortlist.status === "active")
+    .sort((a, b) => a.shortlist.rank - b.shortlist.rank)
+    .slice(0, SHORTLIST_SIZE);
+}
+
+function renderWatchlist() {
+  const wrap = document.getElementById("watchlist");
+  wrap.innerHTML = "";
+
+  const topFive = currentTopFive();
+
+  topFive.forEach((c) => {
+    const slice = sliceHistory(c.priceHistory, state.timeframe);
+    const stats = statsForSlice(slice);
+    const tf = c.byTimeframe[state.timeframe];
+    const band = scoreBand(tf.opportunityScore);
+    const chgClass = stats.changePct >= 0 ? "up" : "down";
+
+    const row = document.createElement("div");
+    row.className = "watchlist-row" + (c.id === state.selectedCompanyId ? " is-selected" : "");
+    row.innerHTML = `
+      <div class="wr-rank">#${c.shortlist.rank}</div>
+      <div class="wr-id">
+        <div class="ticker">${c.ticker}</div>
+        <div class="name">${c.name}</div>
+        <div class="badge-row">
+          <span class="score-chip band-${bandSlug(band.label)}">${tf.opportunityScore} · ${band.label}</span>
+        </div>
+      </div>
+      <div class="wr-spark">${buildChart(slice, { width: 70, height: 32, padLeft: 1, padRight: 1, padTop: 2, padBottom: 2 })}</div>
+      <div class="wr-price">
+        <div class="price">${fmtMoney(stats.current)}</div>
+        <div class="chg ${chgClass}">${fmtPct(stats.changePct)}</div>
+      </div>
+    `;
+    row.addEventListener("click", () => {
+      state.selectedCompanyId = c.id;
+      state.activeScenario = "base";
+      renderWatchlist();
+      renderDetail(c.id);
+      document.getElementById("app").classList.add("detail-active");
+      const scroller = document.getElementById("detailScroll");
+      if (typeof scroller.scrollTo === "function") scroller.scrollTo({ top: 0 });
+      else scroller.scrollTop = 0;
+    });
+    wrap.appendChild(row);
+  });
+
+  if (topFive.length < SHORTLIST_SIZE) {
+    const note = document.createElement("p");
+    note.className = "shortlist-empty-note";
+    note.textContent = "Additional opportunities are currently under review.";
+    wrap.appendChild(note);
+  }
+}
+
+/* ---------------- detail page ---------------- */
+
+const GRANULARITY_OPTIONS = [
+  { id: "day", label: "Day" },
+  { id: "week", label: "Week" },
+  { id: "month", label: "Month" },
+];
+
+function renderDetail(companyId) {
+  const c = getCompany(companyId);
+  const slice = sliceHistory(c.priceHistory, state.timeframe);
+  const stats = statsForSlice(slice); // always computed from full daily data, independent of chart granularity
+  const showGranularityToggle = state.timeframe === "3m";
+  const chartSlice = showGranularityToggle
+    ? resampleHistory(slice, state.data.meta.asOfDate, state.chartGranularity)
+    : slice;
+  const tf = c.byTimeframe[state.timeframe];
+  const band = scoreBand(tf.opportunityScore);
+  const direction = BAND_DIRECTION[band.label] || "steady";
+  const chgClass = stats.changePct >= 0 ? "up" : "down";
+  const scenarios = tf.scenarios;
+  const kf = c.keyFinancials || {};
+  const conf = CONFIDENCE_BADGE[tf.confidence] || CONFIDENCE_BADGE.Medium;
+
+  const cc0 = chartColors();
+  const scenarioColorMap = { bear: cc0.bad, base: cc0.neutral, bull: cc0.good };
+  const activeKey = state.activeScenario in scenarios ? state.activeScenario : "base";
+  const activeScenarioData = scenarios[activeKey];
+
+  const chartSvg = buildChart(chartSlice, {
+    width: 640, height: 220,
+    padLeft: 4, padRight: 60, padTop: 14, padBottom: 22,
+    showLabels: true, showDates: true, asOfDate: state.data.meta.asOfDate,
+    projection: {
+      price: activeScenarioData.price,
+      color: scenarioColorMap[activeKey],
+      label: fmtMoney(activeScenarioData.price),
+    },
+  });
+
+  const content = document.getElementById("detailContent");
+  content.className = "detail-inner";
+
+  const scenarioCol = (key, label) => {
+    const s = scenarios[key];
+    const delta = ((s.price / stats.current) - 1) * 100;
+    return `
+      <div class="scenario-col ${key}${key === activeKey ? " is-active" : ""}" data-scenario="${key}">
+        <div class="label">${label}</div>
+        <div class="price">${fmtMoney(s.price)}</div>
+        <div class="delta ${delta >= 0 ? "up" : "down"}">${fmtPct(delta)}</div>
+        <div class="note">${s.note}</div>
+      </div>
+    `;
+  };
+
+  const peText = kf.peRatio == null ? "N/A" : kf.peRatio.toFixed(1) + "x";
+  const connector = BAND_CONNECTOR[band.label] || "reflecting";
+  const conclusion = `${band.label} opportunity for the ${timeframeLabel(state.timeframe)} view, ${connector} ${c.conclusionReason || "the evidence on file"}.`;
+
+  const featuredTrends = c.evidence.financialTrends.slice(0, 3);
+  const featuredCatalysts = c.evidence.catalysts.slice(0, 2);
+  const featuredRisks = c.evidence.risks.slice(0, 2);
+
+  content.innerHTML = `
+    <p class="detail-eyebrow">${c.ticker} · ${c.sector}</p>
+    <h1 class="detail-name">${c.name}</h1>
+
+    <div class="detail-price-row">
+      <span class="detail-price">${fmtMoney(stats.current)}</span>
+      <span class="detail-chg ${chgClass}">${fmtPct(stats.changePct)}</span>
+    </div>
+    <div class="detail-rel">vs. S&amp;P 500 (trailing 6 months): ${fmtPct(c.price.relativePerformance)}</div>
+
+    <div class="detail-timeframe-chips" id="detailTimeframeChips"></div>
+    <p class="timeframe-lock-msg" id="detailTimeframeLockMsg"></p>
+
+    ${showGranularityToggle ? `
+      <div class="granularity-toggle" id="granularityToggle">
+        ${GRANULARITY_OPTIONS.map((g) => `
+          <button class="granularity-chip${g.id === state.chartGranularity ? " is-selected" : ""}" data-granularity="${g.id}">${g.label}</button>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    <div class="chart-wrap">${chartSvg}</div>
+    <div class="chart-stats">
+      <div class="cs"><div class="k">Open</div><div class="v">${fmtMoney(stats.open)}</div></div>
+      <div class="cs"><div class="k">High</div><div class="v">${fmtMoney(stats.high)}</div></div>
+      <div class="cs"><div class="k">Low</div><div class="v">${fmtMoney(stats.low)}</div></div>
+    </div>
+
+    <div class="direction-row">
+      <div class="direction-item up${direction === "up" ? " is-active" : ""}"><span class="arrow">▲</span> Likely to Rise</div>
+      <div class="direction-item steady${direction === "steady" ? " is-active" : ""}"><span class="arrow">→</span> Steady</div>
+      <div class="direction-item down${direction === "down" ? " is-active" : ""}"><span class="arrow">▼</span> Maybe Not</div>
+    </div>
+
+    <div class="recommend-card">
+      <div class="recommend-top">
+        <div class="recommend-verdict band-${bandSlug(band.label)}">${band.label}</div>
+        <div class="recommend-score">${tf.opportunityScore}<span class="score-of100">/100</span></div>
+      </div>
+      <div class="recommend-pills">
+        <span class="pill ${riskClass(tf.risk)}">${tf.risk} risk</span>
+        <span class="pill">${conf.label} confidence</span>
+      </div>
+      <p class="recommend-oneliner">${conclusion}</p>
+    </div>
+
+    <p class="section-label">Worst Case, Most Likely, Best Case</p>
+    <div class="scenario-row">
+      ${scenarioCol("bear", "Worst Case")}
+      ${scenarioCol("base", "Most Likely")}
+      ${scenarioCol("bull", "Best Case")}
+    </div>
+
+    <p class="section-label">Key Financials</p>
+    <div class="financials-grid">
+      <div class="fs"><div class="k">Market Cap</div><div class="v">${kf.marketCap || "N/A"}</div></div>
+      <div class="fs"><div class="k">P/E Ratio</div><div class="v">${peText}</div></div>
+      <div class="fs"><div class="k">Revenue Growth</div><div class="v">${fmtPct(kf.revenueGrowthYoY || 0)}</div></div>
+      <div class="fs"><div class="k">Gross Margin</div><div class="v">${fmtPlainPct(kf.grossMargin || 0)}</div></div>
+      <div class="fs"><div class="k">FCF Yield</div><div class="v">${fmtPct(kf.fcfYield || 0)}</div></div>
+      <div class="fs"><div class="k">Dividend Yield</div><div class="v">${fmtPlainPct(kf.dividendYield || 0)}</div></div>
+    </div>
+
+    <p class="section-label">Financial Trends</p>
+    ${featuredTrends.map((t) => `
+      <div class="trend-row">
+        <div class="trend-body">
+          <div class="metric">${t.metric}</div>
+          <div class="detail">${t.detail}</div>
+        </div>
+        <div class="trend-stat-col">
+          <div class="trend-stat ${trendClass(t.trend)}">${t.stat}</div>
+          <span class="trend-pill ${trendClass(t.trend)}">${trendArrow(t.trend)} ${t.trend}</span>
+        </div>
+      </div>
+    `).join("")}
+
+    <p class="section-label">Catalysts &amp; Risks</p>
+    <div class="two-col">
+      <div>
+        <div class="col-title catalysts">Catalysts</div>
+        <ul>${featuredCatalysts.map((x) => `<li>${x}</li>`).join("")}</ul>
+      </div>
+      <div>
+        <div class="col-title risks">Risks</div>
+        <ul>${featuredRisks.map((x) => `<li>${x}</li>`).join("")}</ul>
+      </div>
+    </div>
+
+    <p class="section-label">Thesis Check</p>
+    <div class="thesis-card">
+      <div class="thesis-top">
+        <span class="confidence-badge conf-${conf.slug}">${conf.label} Confidence</span>
+      </div>
+      <p class="thesis-rationale">${conf.rationale}</p>
+      <div class="stoploss-line">
+        Thesis invalidated below: <span class="stoploss-price">${fmtMoney(scenarios.bear.price)}</span>
+        <div class="stoploss-note">If the price falls to or below this level for this timeframe, the case above should be reconsidered.</div>
+      </div>
+      <div class="invalidation-box">
+        <div class="col-title">This view would be wrong if</div>
+        <ul>${c.evidence.invalidation.map((x) => `<li>${x}</li>`).join("")}</ul>
+      </div>
+    </div>
+
+    <p class="section-label">Developments &amp; News</p>
+    ${c.evidence.developments.map((d) => `
+      <div class="news-card">
+        <div class="news-tag">${c.ticker.slice(0, 2)}</div>
+        <div class="news-body">
+          <div class="title">${d.title}</div>
+          <div class="date">${d.date}</div>
+          <div class="detail">${d.detail}</div>
+        </div>
+      </div>
+    `).join("")}
+
+    <p class="detail-disclaimer">${state.data.meta.disclosure}</p>
+  `;
+
+  renderTimeframeChipsInto(document.getElementById("detailTimeframeChips"), document.getElementById("detailTimeframeLockMsg"));
+
+  content.querySelectorAll(".scenario-col").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.activeScenario = el.dataset.scenario;
+      renderDetail(c.id);
+    });
+  });
+
+  content.querySelectorAll(".granularity-chip").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.chartGranularity = el.dataset.granularity;
+      renderDetail(c.id);
+    });
+  });
+}
+
+init();
+
+</script>
+</body>
+</html>
